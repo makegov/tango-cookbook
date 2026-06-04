@@ -1,0 +1,42 @@
+name: Execute notebooks
+
+on:
+  pull_request:
+    paths:
+      - "notebooks/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "justfile"
+      - ".github/workflows/notebooks.yml"
+  push:
+    branches: [main]
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: taiki-e/install-action@just
+
+      - name: Install dependencies
+        run: just sync
+
+      - name: Lint notebook frontmatter
+        run: just lint
+
+      - name: Execute notebooks
+        env:
+          TANGO_API_KEY: ${{ secrets.TANGO_API_KEY }}
+        run: |
+          shopt -s nullglob
+          notebooks=(notebooks/*.ipynb)
+          if [ ${#notebooks[@]} -eq 0 ]; then
+            echo "No notebooks to execute."
+            exit 0
+          fi
+          just execute

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.python-version
+
+# uv
+# (keep uv.lock checked in)
+
+# Environment
+.env
+.env.local
+
+# Jupyter
+.ipynb_checkpoints/
+.jupyter/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+
+.mg-tools/*
+.claude/
