@@ -8,10 +8,11 @@ nb := "notebooks/*.ipynb"
 default:
     @just --list
 
-# First-time setup: install deps and stub out .env.
+# First-time setup: install deps, stub .env, register nbdime as git diff/merge driver.
 setup:
     uv sync --all-groups
     @[ -f .env ] || cp .env.example .env
+    uv run nbdime config-git --enable --global
     @echo "Edit .env to add your TANGO_API_KEY."
 
 # Refresh the environment from pyproject.toml / uv.lock.
@@ -30,6 +31,6 @@ lint:
 execute:
     uv run jupyter execute --timeout=180 {{nb}}
 
-# Strip outputs from notebooks before committing.
-strip:
-    uv run nbstripout {{nb}}
+# Re-execute every notebook in place, saving fresh outputs into the .ipynb files.
+refresh:
+    uv run jupyter execute --inplace --timeout=180 {{nb}}

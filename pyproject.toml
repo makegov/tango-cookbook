@@ -12,7 +12,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "nbstripout>=0.7",
     "nbclient>=0.10",
+    "nbdime>=4.0",
     "pyyaml>=6.0",
 ]

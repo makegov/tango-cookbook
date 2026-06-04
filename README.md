@@ -30,18 +30,18 @@ client = TangoClient(api_key=os.environ["TANGO_API_KEY"])
 | Command         | What it does                                                  |
 | --------------- | ------------------------------------------------------------- |
 | `just`          | List available recipes.                                       |
-| `just setup`    | First-time install (deps + `.env`).                           |
+| `just setup`    | First-time install (deps + `.env` + `nbdime` git driver).     |
 | `just sync`     | Refresh deps after `pyproject.toml` / `uv.lock` changes.      |
 | `just lab`      | Launch JupyterLab with `.env` loaded.                         |
 | `just execute`  | Run every notebook end-to-end (matches CI).                   |
-| `just strip`    | Strip outputs from notebooks before committing.               |
+| `just refresh`  | Re-execute every notebook in place to refresh outputs.        |
 
 ## Recipe conventions
 
-- One notebook per recipe; number them (`00_`, `01_`, …) so they sort.
+- One notebook per recipe; descriptive slug for the filename.
 - Read secrets from `os.environ` — `just` puts `.env` there for you.
-- Clear outputs before committing: `just strip`.
-- Keep notebooks runnable end-to-end. CI runs `just execute` on every PR.
+- **Commit notebook outputs.** A recipe's *result* is part of what it teaches, so notebooks render fully on GitHub. CI re-executes on every PR to catch drift. Use `just refresh` before committing if you've edited code without re-running.
+- `nbdime` is installed and wired as the git diff/merge driver (via `just setup`) so `git diff` on notebooks is readable.
 
 ## License
 

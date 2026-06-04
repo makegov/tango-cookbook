@@ -60,4 +60,7 @@ If a tag accumulates ~5 recipes, promote it to its own folder under `notebooks/`
 1. Drop a notebook in `notebooks/` with a descriptive slug.
 2. Add the frontmatter cell above.
 3. Add a row to the relevant section of this README.
-4. `just lint` (CI runs this on every PR) and `just strip`, then commit.
+4. `just refresh` so committed outputs match the current code.
+5. `just lint` (CI runs this on every PR), then commit.
+
+> **Outputs are committed.** This is deliberate: a recipe's *result* is part of what it teaches. Reviewers see outputs in the diff thanks to `nbdime` (registered as the git diff/merge driver by `just setup`). CI re-executes every notebook to catch drift between code and committed outputs.
