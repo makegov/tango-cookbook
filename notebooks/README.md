@@ -7,6 +7,7 @@ Browse by tag below, or open any notebook directly.
 | Recipe | What it shows | Endpoints |
 | ------ | ------------- | --------- |
 | [Following NASA's Deep Space Exploration budget](./budget-deep-space-exploration.ipynb) | Trace a federal account from request through outlay, then see who got the contracts. | `list_budget_accounts`, `get_budget_account_recipients` |
+| [Scoring federal accounts by contract share](./budget-contractability-score.ipynb) | Which agency accounts actually buy things from contractors — and why the biggest ones usually don't. | `list_budget_accounts` |
 
 <!-- Add new sections as tags accumulate (Contracts, Opportunities, Notices, …). -->
 
