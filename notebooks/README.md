@@ -9,7 +9,25 @@ Browse by tag below, or open any notebook directly.
 | [Following NASA's Deep Space Exploration budget](./budget-deep-space-exploration.ipynb) | Trace a federal account from request through outlay, then see who got the contracts. | `list_budget_accounts`, `get_budget_account_recipients` |
 | [Scoring federal accounts by contract share](./budget-contractability-score.ipynb) | Which agency accounts actually buy things from contractors — and why the biggest ones usually don't. | `list_budget_accounts` |
 
-<!-- Add new sections as tags accumulate (Contracts, Opportunities, Notices, …). -->
+## Contracts
+
+| Recipe | What it shows | Endpoints |
+| ------ | ------------- | --------- |
+| [Mapping a NAICS code to its real federal buyers](./naics-to-agency-map.ipynb) | Rank the departments actually spending on a NAICS, with a year-over-year delta to spot risers and fallers. | `list_contracts`, `list_naics` |
+
+## Entities
+
+| Recipe | What it shows | Endpoints |
+| ------ | ------------- | --------- |
+| [Building an incumbent radar from one UEI](./incumbent-radar.ipynb) | One UEI → entity profile, contracts, IDVs, OTAs, subawards. Agency mix, NAICS/PSC mix, and recompete windows. | `list_entities`, `get_entity`, `list_entity_contracts`, `list_entity_idvs`, `list_entity_otas`, `list_entity_subawards` |
+
+## Protests
+
+| Recipe | What it shows | Endpoints |
+| ------ | ------------- | --------- |
+| [Reading protest history before you bid](./protest-landmines.ipynb) | Pull an agency's protest record, filter to sustained outcomes, and read GAO's digest of what went wrong. | `list_protests`, `get_protest` |
+
+<!-- Add new sections as tags accumulate (Opportunities, Notices, …). -->
 
 ---
 
