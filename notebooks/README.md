@@ -53,6 +53,9 @@ Keep it small; add a new tag only when a recipe genuinely doesn't fit any existi
 **Techniques** (how the recipe works)
 `shape` (response shaping), `pagination`, `filtering`, `joining` (combining endpoints), `async`
 
+**Goals** (what the recipe helps a user do)
+`analysis`, `business-development`, `capture`, `proposals`
+
 If a tag accumulates ~5 recipes, promote it to its own folder under `notebooks/`.
 
 ## Adding a recipe

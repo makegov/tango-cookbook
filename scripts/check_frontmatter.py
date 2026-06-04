@@ -7,6 +7,7 @@ unknown tags so contributors can typo-check vs. extend the taxonomy.
 Convention: every notebook's first markdown cell contains a ```yaml code fence
 with `title`, `description`, `tags`, `endpoints`. See notebooks/README.md.
 """
+
 from __future__ import annotations
 
 import json
@@ -25,10 +26,29 @@ REQUIRED_FIELDS = {"title", "description", "tags", "endpoints"}
 # Keep in sync with notebooks/README.md "Tag taxonomy".
 KNOWN_TAGS = {
     # domains
-    "budget", "contracts", "idvs", "otas", "opportunities", "notices",
-    "grants", "entities", "forecasts", "protests", "recipients", "webhooks",
+    "budget",
+    "contracts",
+    "idvs",
+    "otas",
+    "opportunities",
+    "notices",
+    "grants",
+    "entities",
+    "forecasts",
+    "protests",
+    "recipients",
+    "webhooks",
     # techniques
-    "shape", "pagination", "filtering", "joining", "async",
+    "shape",
+    "pagination",
+    "filtering",
+    "joining",
+    "async",
+    # goals
+    "analysis",
+    "business-development",
+    "capture",
+    "proposals",
 }
 
 FENCE_RE = re.compile(r"```yaml\s*\n(.*?)\n```", re.DOTALL)
