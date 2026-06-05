@@ -2,7 +2,7 @@
 
 Public recipes for working with the [Tango API](https://tango.makegov.com), primarily via the [`tango-python`](https://pypi.org/project/tango-python/) SDK.
 
-Each recipe is a self-contained Jupyter notebook in [`notebooks/`](./notebooks/).
+Each recipe is a self-contained Jupyter notebook in [`notebooks/`](./notebooks/). More ambitious patterns — runnable scripts, agents, services — live in [`examples/`](./examples/).
 
 ## Setup
 

@@ -16,3 +16,6 @@ dev = [
     "nbdime>=4.0",
     "pyyaml>=6.0",
 ]
+examples = [
+    "anthropic>=0.40",
+]

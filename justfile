@@ -34,3 +34,7 @@ execute:
 # Re-execute every notebook in place, saving fresh outputs into the .ipynb files.
 refresh:
     uv run jupyter execute --inplace --timeout=180 {{nb}}
+
+# Run the opportunities agent example. Pass a question or use the default.
+agent *question:
+    uv run python examples/opportunities-agent/agent.py {{question}}
