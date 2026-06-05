@@ -27,15 +27,20 @@ from tango import TangoClient
 SECRET_FILE = Path(__file__).parent / "webhook.secret"
 
 
-def write_secret(secret: str) -> Path:
-    """Write the secret to a 0600 file, atomically, without ever printing it."""
+def write_secret(secret: str) -> None:
+    """Write the secret to a 0600 file, atomically, without ever printing it.
+
+    Deliberately returns None so the caller can't accidentally pipe the path
+    (or anything derived from a secret-handling function) into a log line and
+    trip taint-propagation rules. Reference the module-level SECRET_FILE
+    constant in user-facing output instead.
+    """
     # os.open with O_CREAT|O_WRONLY|O_TRUNC + mode 0o600 creates the file with
     # the right permissions in one syscall. Avoids the open-then-chmod race
     # where the file briefly exists world-readable.
     fd = os.open(SECRET_FILE, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as f:
         f.write(f"TANGO_WEBHOOK_SECRET={secret}\n")
-    return SECRET_FILE
 
 
 def main() -> int:
@@ -57,11 +62,11 @@ def main() -> int:
     print(f"endpoint_id:  {endpoint.id}")
     print(f"callback_url: {endpoint.callback_url}")
 
-    path = write_secret(endpoint.secret)
-    print(f"secret:       wrote to {path} (mode 0600)")
+    write_secret(endpoint.secret)
+    print(f"secret:       wrote to {SECRET_FILE} (mode 0600)")
     print()
     print("Load it before starting the receiver:")
-    print(f"  set -a && source {path} && set +a && just webhook-serve")
+    print(f"  set -a && source {SECRET_FILE} && set +a && just webhook-serve")
     print()
 
     # Wire one example alert so the endpoint actually receives something.
