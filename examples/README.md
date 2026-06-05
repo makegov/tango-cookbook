@@ -5,6 +5,8 @@ More ambitious patterns built on the Tango API. Where [`notebooks/`](../notebook
 | Example | What it shows |
 | --- | --- |
 | [`opportunities-agent/`](./opportunities-agent/) | A minimal Claude tool-use loop that lets you ask plain-English questions about federal opportunities. |
+| [`saved-search-watcher/`](./saved-search-watcher/) | A YAML-driven watcher: pull a saved search on a schedule, diff against a JSON state file, alert on what's new. |
+| [`webhook-receiver/`](./webhook-receiver/) | A FastAPI app that accepts Tango webhook deliveries — signature-verified, idempotent, with a pluggable sink. |
 
 ## Conventions
 

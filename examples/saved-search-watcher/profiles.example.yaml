@@ -1,0 +1,45 @@
+# Saved-search profiles for examples/saved-search-watcher.
+#
+# Each profile is a query the watcher runs every time it's invoked. New results
+# (compared to the last run, dedup'd by `key`) get sent to the profile's `sink`.
+#
+# Required: name, endpoint, key, filters.
+# Optional: fields (shown in the alert line), sink (default stdout), limit (default 25).
+#
+# Endpoints supported: opportunities, contracts, notices, forecasts, protests.
+# Filter keys mirror the SDK's `list_*` kwargs — see https://tango.makegov.com.
+#
+# Filter values may use {today} as a placeholder for the current ISO date,
+# which is handy for "active and not yet closed."
+
+- name: small-IT-recompetes
+  endpoint: opportunities
+  key: opportunity_id
+  fields: [title, solicitation_number, response_deadline]
+  filters:
+    naics: "541512"            # Computer Systems Design Services
+    set_aside: SBA             # total small business set-aside
+    notice_type: o             # Solicitation (real, bid-able)
+    active: true
+    # `active` does not guarantee a future deadline. Add this filter
+    # if you only want opportunities you can still respond to:
+    #   response_deadline_after: "{today}"
+  sink: stdout
+
+- name: sustained-protests-at-VA
+  endpoint: protests
+  key: case_number
+  fields: [protester, agency, outcome, decision_date]
+  filters:
+    agency: VA
+    outcome: sustained
+  sink: stdout
+
+- name: HHS-cybersecurity-forecasts
+  endpoint: forecasts
+  key: id                      # forecasts use a bare `id` field
+  fields: [title, agency, status]
+  filters:
+    agency: HHS
+    search: cybersecurity
+  sink: stdout
