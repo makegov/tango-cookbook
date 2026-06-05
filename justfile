@@ -38,3 +38,15 @@ refresh:
 # Run the opportunities agent example. Pass a question or use the default.
 agent *question:
     uv run python examples/opportunities-agent/agent.py {{question}}
+
+# Run the saved-search watcher once. Pass flags like --seed or --dry-run.
+watch *flags:
+    uv run python examples/saved-search-watcher/watcher.py {{flags}}
+
+# Start the webhook receiver on :8000.
+webhook-serve:
+    uv run uvicorn examples.webhook-receiver.server:app --reload --port 8000 --host 0.0.0.0
+
+# Register a Tango webhook endpoint + sample alert against a public callback URL.
+webhook-register url:
+    uv run python examples/webhook-receiver/register.py {{url}}
