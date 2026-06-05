@@ -7,9 +7,10 @@ Run (from the repo root):
 Or directly:
     uv run python examples/webhook-receiver/register.py <callback-url>
 
-The script prints the endpoint id and the shared secret. Put the secret in your
-environment as TANGO_WEBHOOK_SECRET before starting the server — that's what
-the receiver uses to verify each delivery's signature.
+The script creates the endpoint, writes the shared secret to a 0600 file
+beside this script (default: ./webhook.secret), and tells you how to load it
+into the receiver's environment. The secret is *not* printed to stdout —
+print would land it in shell history, terminal recordings, and CI logs.
 
 For local development, expose port 8000 with a tunnel (ngrok, cloudflared,
 tailscale funnel, etc.) and pass the public URL as the callback. Tango will
@@ -20,7 +21,21 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from tango import TangoClient
+
+SECRET_FILE = Path(__file__).parent / "webhook.secret"
+
+
+def write_secret(secret: str) -> Path:
+    """Write the secret to a 0600 file, atomically, without ever printing it."""
+    # os.open with O_CREAT|O_WRONLY|O_TRUNC + mode 0o600 creates the file with
+    # the right permissions in one syscall. Avoids the open-then-chmod race
+    # where the file briefly exists world-readable.
+    fd = os.open(SECRET_FILE, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(f"TANGO_WEBHOOK_SECRET={secret}\n")
+    return SECRET_FILE
 
 
 def main() -> int:
@@ -39,11 +54,14 @@ def main() -> int:
         is_active=True,
     )
 
-    print(f"endpoint_id: {endpoint.id}")
+    print(f"endpoint_id:  {endpoint.id}")
     print(f"callback_url: {endpoint.callback_url}")
+
+    path = write_secret(endpoint.secret)
+    print(f"secret:       wrote to {path} (mode 0600)")
     print()
-    print("SECRET (copy this into your environment, only shown once):")
-    print(f"  export TANGO_WEBHOOK_SECRET={endpoint.secret}")
+    print("Load it before starting the receiver:")
+    print(f"  set -a && source {path} && set +a && just webhook-serve")
     print()
 
     # Wire one example alert so the endpoint actually receives something.
@@ -62,7 +80,7 @@ def main() -> int:
         endpoint=endpoint.id,
     )
     print(f"alert_id: {alert.alert_id}")
-    print(f"status: {alert.status}")
+    print(f"status:   {alert.status}")
     print()
 
     # Fire a synthetic delivery so you can confirm the receiver is up.

@@ -28,14 +28,14 @@ ngrok http 8000
 just webhook-register https://<your-tunnel>.ngrok.app/webhooks/tango
 ```
 
-`webhook-register` prints a `TANGO_WEBHOOK_SECRET`. **Copy it into your environment** and restart the server — the receiver rejects any delivery whose signature doesn't match:
+`webhook-register` writes the new `TANGO_WEBHOOK_SECRET` to `examples/webhook-receiver/webhook.secret` (mode `0600`, gitignored) — it is **not** printed to stdout, because stdout ends up in shell history, terminal recorders, and CI logs. Load it before restarting the receiver:
 
 ```bash
-export TANGO_WEBHOOK_SECRET=<the secret>
+set -a && source examples/webhook-receiver/webhook.secret && set +a
 just webhook-serve
 ```
 
-It also fires a test delivery, so you should see one event in the server logs almost immediately. After that, real matches against the alert's filters will stream in.
+`register.py` also fires a test delivery, so you should see one event in the server logs almost immediately. After that, real matches against the alert's filters will stream in.
 
 ## Environment
 
