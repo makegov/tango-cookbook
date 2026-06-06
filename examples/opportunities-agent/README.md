@@ -22,6 +22,20 @@ uv run python examples/opportunities-agent/agent.py "your question here"
 
 Needs `TANGO_API_KEY` and `ANTHROPIC_API_KEY` in `.env`. (`.env.example` lists both.)
 
+### Or run it against a local model
+
+`local_agent.py` is the same loop, swapped onto any OpenAI-compatible endpoint — Ollama, llama.cpp, vLLM, LM Studio. With Ollama:
+
+```bash
+ollama pull qwen2.5:14b      # or qwen2.5:32b, llama3.3:70b, gpt-oss:20b
+just local-agent             # default question
+just local-agent "your question here"
+```
+
+Override the model or endpoint via env (`LOCAL_MODEL`, `LOCAL_BASE_URL`). Only `TANGO_API_KEY` is required; no Anthropic key needed. `diff agent.py local_agent.py` is the cheapest way to see exactly where the Anthropic and OpenAI tool-use protocols differ.
+
+Expect rougher reasoning than Sonnet — smaller models loop more, occasionally mangle argument names, and need a tighter `MAX_TURNS`. Good enough for the simple incumbent-radar question; thin out fast on the harder ones.
+
 ### Questions that work well vs. questions that don't
 
 The agent shines when the question is narrow enough that one or two contract searches can plausibly identify an incumbent. Examples:

@@ -51,7 +51,7 @@ Filtering rules of thumb:
 - Keyword `search` is vector-backed (semantic). Short phrases (1-2 words like "website modernization", "help desk", "court reporter") work better than long ones — extra words dilute the vector and can drop the strongest match out of the top results.
 - For finding incumbents, prefer a specific agency over a NAICS-only contract search. NAICS-only searches across all of government are noisy.
 
-When you have enough information, give a tight, action-oriented summary. Skip the field-by-field recap. Be honest if data is thin or a search returned nothing useful — say so and suggest what to try next.
+When you have enough information, give a tight, action-oriented summary. Skip the field-by-field recap. Always include the SAM.gov link for the opportunity (the `sam_url` field from the tool result). Be honest if data is thin or a search returned nothing useful — say so and suggest what to try next.
 
 Don't keep retrying searches that come back empty. Two empty searches on a question is a signal to stop, deliver what you have, and tell the user what was missing — not to keep guessing keyword variations."""
 
@@ -165,27 +165,33 @@ TOOLS = [
 # decisions — what to search for, which result to drill into — happen in the
 # model, not here.
 
+# Field list passed as Tango's `shape` parameter. Tango's default shape strips
+# everything except 5 fields, including the `sam_url` that we want the model to
+# surface in the brief. (Tango computes `sam_url` itself, using the *latest*
+# notice id with hyphens stripped — which is what SAM.gov actually accepts —
+# so we never want to construct it client-side.)
+OPP_SHAPE = (
+    "opportunity_id,title,solicitation_number,naics_code,psc_code,set_aside,"
+    "response_deadline,first_notice_date,active,place_of_performance,office,sam_url"
+)
+
+# Details get the same fields plus description + primary contact for the brief.
+OPP_DETAILS_SHAPE = OPP_SHAPE + ",description,primary_contact"
+
+
 def _trim_opportunity(opp: dict[str, Any]) -> dict[str, Any]:
-    """Keep just the fields useful for triage. Full record is available via details."""
-    return {
-        k: opp.get(k)
-        for k in (
-            "opportunity_id", "title", "notice_type", "agency", "naics",
-            "psc", "set_aside", "response_deadline", "first_notice_date",
-            "active", "place_of_performance",
-        )
-        if opp.get(k) is not None
-    }
+    """Drop null fields so the JSON we hand the model stays compact."""
+    return {k: v for k, v in opp.items() if v is not None}
 
 
 def run_tool(tango: TangoClient, name: str, args: dict[str, Any]) -> Any:
     if name == "search_opportunities":
         limit = min(int(args.pop("limit", 5)), 25)
-        page = tango.list_opportunities(limit=limit, **args)
+        page = tango.list_opportunities(limit=limit, shape=OPP_SHAPE, **args)
         return {"count": page.count, "results": [_trim_opportunity(r) for r in page.results]}
 
     if name == "get_opportunity_details":
-        return tango.get_opportunity(args["opportunity_id"])
+        return tango.get_opportunity(args["opportunity_id"], shape=OPP_DETAILS_SHAPE)
 
     if name == "search_contracts":
         limit = min(int(args.pop("limit", 5)), 25)
