@@ -1,8 +1,32 @@
 # Tango Cookbook
 
-Public recipes for working with the [Tango API](https://tango.makegov.com), primarily via the [`tango-python`](https://pypi.org/project/tango-python/) SDK.
+Recipes and reference apps for the [Tango API](https://tango.makegov.com), primarily via the [`tango-python`](https://pypi.org/project/tango-python/) SDK. Everything here runs against the live API; notebooks are re-executed nightly in CI, so what you see is what runs.
 
-Each recipe is a self-contained Jupyter notebook in [`notebooks/`](./notebooks/). More ambitious patterns — runnable scripts, agents, services — live in [`examples/`](./examples/).
+## Two surfaces
+
+**[`notebooks/`](./notebooks/)** — self-contained Jupyter recipes that read top-to-bottom and render their outputs on GitHub. Read one, fork the cells you need.
+
+**[`examples/`](./examples/)** — runnable scripts, agents, and services to fork as the starting point for something real. Each ships with its own README.
+
+## What's here
+
+### Notebooks
+
+| Recipe | What it shows |
+| --- | --- |
+| [`incumbent-radar`](./notebooks/incumbent-radar.ipynb) | Pull a competitor's contracts, IDVs, OTAs, and subaward flow from one UEI to surface agency mix, NAICS mix, and recompete windows. |
+| [`naics-to-agency-map`](./notebooks/naics-to-agency-map.ipynb) | Given a NAICS code, rank the agencies actually spending money on it — with a year-over-year delta to spot risers and fallers. |
+| [`protest-landmines`](./notebooks/protest-landmines.ipynb) | Pull GAO protest decisions for a target agency, sort by outcome, and pull the digests for the sustained ones to learn what went wrong. |
+| [`budget-contractability-score`](./notebooks/budget-contractability-score.ipynb) | Which agency accounts actually buy things from contractors — and why the biggest ones usually don't. |
+| [`budget-deep-space-exploration`](./notebooks/budget-deep-space-exploration.ipynb) | Trace a federal account from request through outlay, then see who got the contracts. |
+
+### Examples
+
+| Example | What it shows |
+| --- | --- |
+| [`opportunities-agent`](./examples/opportunities-agent/) | A minimal Claude tool-use loop that answers plain-English questions about federal opportunities. |
+| [`saved-search-watcher`](./examples/saved-search-watcher/) | A YAML-driven watcher: poll a saved search on a schedule, diff against a JSON state file, alert on what's new. |
+| [`webhook-receiver`](./examples/webhook-receiver/) | A FastAPI app that accepts Tango webhook deliveries — signature-verified, idempotent, with a pluggable sink. |
 
 ## Setup
 
