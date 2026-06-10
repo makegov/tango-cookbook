@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tango Lookup",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Quick lookup for entities and contracts in Tango",
   "permissions": [
     "storage",
