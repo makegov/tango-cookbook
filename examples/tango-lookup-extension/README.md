@@ -8,6 +8,9 @@ A Chrome extension for quick lookups of federal contracts, entities, and opportu
 
 - Search by UEI, PIID, solicitation number, award key, or name
 - Full-text opportunity search — "Golden Dome" finds the Golden Dome CSO, not just exact solicitation-number matches
+- Solicitation numbers also match the awards they became (FPDS `solicitation_identifier`)
+- Format-tolerant identifiers — "N69450-19-R-1709" is automatically retried as "N6945019R1709" (FPDS strips punctuation, SAM keeps it)
+- Honest empty state: says what was searched, and links to SAM.gov when Tango has no match
 - View entity, contract, IDV, and opportunity details in a compact card UI
 - Expand any result to see the full API response
 - Right-click context menu to look up selected text

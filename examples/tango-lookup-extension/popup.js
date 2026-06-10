@@ -142,6 +142,17 @@ async function apiPost(path, body) {
   return resp.json();
 }
 
+// Identifier-ish queries ("N69450-19-R-1709") get a second pass with
+// punctuation stripped. FPDS stores identifiers bare (140P4226Q0007),
+// SAM keeps the dashes (HQ0202-26-S-0001) — the user shouldn't have to
+// know which convention the source system uses, or retry formats by hand.
+function strippedVariant(q) {
+  if (!/\d/.test(q)) return null;
+  if (!/^[A-Za-z0-9\s\-._/]{6,40}$/.test(q)) return null;
+  const stripped = q.replace(/[\s\-._/]/g, "");
+  return stripped !== q && stripped.length >= 6 ? stripped : null;
+}
+
 let lookupId = 0;
 async function doLookup(q) {
   const thisLookup = ++lookupId;
@@ -167,12 +178,27 @@ async function doLookup(q) {
   // solicitation number) — entity fuzzy-matches almost always return
   // *something*, so an opportunities search gated behind "no other hits"
   // would never run for queries like "Golden Dome".
-  const [resolved, con, idv, sol, oppText] = await Promise.all([
+  //
+  // Identifier lookups run once per format variant (as typed +
+  // punctuation-stripped), and a solicitation number is also matched
+  // against awards (FPDS solicitation_identifier) — "what did this
+  // solicitation become?" is the question behind most sol-number lookups.
+  const stripped = strippedVariant(q);
+  const variants = stripped ? [q, stripped] : [q];
+  const perVariant = variants.map(v => {
+    const enc = encodeURIComponent(v);
+    return Promise.all([
+      apiFetch("/api/contracts/" + enc + "/?shape=" + CONTRACT_SHAPE).catch(() => null),
+      apiFetch("/api/contracts/?piid=" + enc + "&shape=" + CONTRACT_SHAPE).catch(() => null),
+      apiFetch("/api/contracts/?solicitation_identifier=" + enc + "&shape=" + CONTRACT_SHAPE).catch(() => null),
+      apiFetch("/api/idvs/" + enc + "/?shape=" + IDV_SHAPE).catch(() => null),
+      apiFetch("/api/opportunities/?solicitation_number=" + enc + "&shape=" + OPPORTUNITY_SHAPE).catch(() => null),
+    ]);
+  });
+  const [resolved, oppText, ...variantResults] = await Promise.all([
     apiPost("/api/resolve/", {name: q, target_type: "entity"}).catch(() => null),
-    apiFetch("/api/contracts/" + encodeURIComponent(q) + "/?shape=" + CONTRACT_SHAPE).catch(() => null),
-    apiFetch("/api/idvs/" + encodeURIComponent(q) + "/?shape=" + IDV_SHAPE).catch(() => null),
-    apiFetch("/api/opportunities/?solicitation_number=" + encodeURIComponent(q) + "&shape=" + OPPORTUNITY_SHAPE).catch(() => null),
     apiFetch("/api/opportunities/?search=" + encodeURIComponent(q) + "&shape=" + OPPORTUNITY_SHAPE).catch(() => null),
+    ...perVariant,
   ]);
 
   // Fetch full entity details for each resolver candidate
@@ -185,9 +211,13 @@ async function doLookup(q) {
     entityDetails.forEach(d => { if (d) addCard(entityCard(d)); });
   }
 
-  if (con) addCard(awardCard(con, "contract"));
-  if (idv) addCard(awardCard(idv, "idv"));
-  if (sol?.results) sol.results.slice(0, 5).forEach(d => addCard(opportunityCard(d)));
+  for (const [con, conByPiid, conBySol, idv, sol] of variantResults) {
+    if (con) addCard(awardCard(con, "contract"));
+    if (conByPiid?.results) conByPiid.results.slice(0, 5).forEach(d => addCard(awardCard(d, "contract")));
+    if (conBySol?.results) conBySol.results.slice(0, 5).forEach(d => addCard(awardCard(d, "contract")));
+    if (idv) addCard(awardCard(idv, "idv"));
+    if (sol?.results) sol.results.slice(0, 5).forEach(d => addCard(opportunityCard(d)));
+  }
   if (oppText?.results) oppText.results.slice(0, 5).forEach(d => addCard(opportunityCard(d)));
 
   if (thisLookup !== lookupId) return;
@@ -214,7 +244,15 @@ async function doLookup(q) {
     } else if (lastRequestError) {
       statusEl.textContent = "API error (HTTP " + lastRequestError.status + ")";
     } else {
-      statusEl.textContent = 'No results for "' + q + '"';
+      // Be specific about what was searched: users who get a bare "no
+      // results" on an identifier assume the formatting is wrong and
+      // retry punctuation variants by hand — which we already did.
+      const also = stripped ? ' (also tried "' + stripped + '")' : "";
+      statusEl.innerHTML =
+        'No matches for "' + esc(q) + '"' + esc(also) +
+        " across entities, contracts (PIID and solicitation number), IDVs, and opportunities." +
+        ' Some identifiers are not in public federal data — GSA eBuy RFQ numbers, for example, never appear in SAM.gov feeds. ' +
+        '<a href="https://sam.gov/search/?keywords=' + encodeURIComponent(q) + '" target="_blank" rel="noopener">Search SAM.gov ↗</a>';
     }
   } else {
     statusEl.textContent = "";
