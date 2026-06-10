@@ -2,6 +2,8 @@
 
 A Chrome extension for quick lookups of federal contracts, entities, and opportunities in the [Tango API](https://docs.makegov.com/).
 
+![Tango Lookup demo: searching a vendor by name, a contract by PIID, pivoting to the recipient, and an opportunity by solicitation number](demo.gif)
+
 ## Features
 
 - Search by UEI, PIID, solicitation number, award key, or name

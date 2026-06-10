@@ -97,13 +97,28 @@ async function ensureHostPermission(baseUrl) {
   permissionCache[origin] = true;
 }
 
+// Last failure from an API call, so an auth/network problem isn't
+// indistinguishable from a genuinely empty result set. 404s are expected
+// (exact-match lookups miss constantly) and are not recorded.
+let lastRequestError = null;
+
+function recordFailure(resp) {
+  if (resp.status !== 404) lastRequestError = {status: resp.status};
+}
+
 async function apiFetch(path) {
   const cfg = getConfig();
   if (!cfg.key) return null;
   await ensureHostPermission(cfg.url);
   const url = cfg.url + path;
-  const resp = await fetch(url, {headers: {"X-API-KEY": cfg.key}});
-  if (!resp.ok) return null;
+  let resp;
+  try {
+    resp = await fetch(url, {headers: {"X-API-KEY": cfg.key}});
+  } catch (_) {
+    lastRequestError = {network: true};
+    return null;
+  }
+  if (!resp.ok) { recordFailure(resp); return null; }
   return resp.json();
 }
 
@@ -112,12 +127,18 @@ async function apiPost(path, body) {
   if (!cfg.key) return null;
   await ensureHostPermission(cfg.url);
   const url = cfg.url + path;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {"X-API-KEY": cfg.key, "Content-Type": "application/json"},
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) return null;
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      headers: {"X-API-KEY": cfg.key, "Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+  } catch (_) {
+    lastRequestError = {network: true};
+    return null;
+  }
+  if (!resp.ok) { recordFailure(resp); return null; }
   return resp.json();
 }
 
@@ -135,6 +156,7 @@ async function doLookup(q) {
   }
 
   statusEl.textContent = "Searching\u2026";
+  lastRequestError = null;
 
   const cards = [];
   const seen = new Set();
@@ -179,7 +201,16 @@ async function doLookup(q) {
   if (thisLookup !== lookupId) return;
 
   if (cards.length === 0) {
-    statusEl.textContent = 'No results for "' + q + '"';
+    if (lastRequestError?.status === 401 || lastRequestError?.status === 403) {
+      statusEl.innerHTML = 'API key rejected (HTTP ' + lastRequestError.status + ') — <a href="#" id="openOpts" role="link">open settings</a>';
+      document.getElementById("openOpts").addEventListener("click", (ev) => { ev.preventDefault(); chrome.runtime.openOptionsPage(); });
+    } else if (lastRequestError?.network) {
+      statusEl.textContent = "Network error — could not reach " + getConfig().url;
+    } else if (lastRequestError) {
+      statusEl.textContent = "API error (HTTP " + lastRequestError.status + ")";
+    } else {
+      statusEl.textContent = 'No results for "' + q + '"';
+    }
   } else {
     statusEl.textContent = "";
     cards.forEach(c => resultsEl.insertAdjacentHTML("beforeend", c.html));
@@ -191,6 +222,10 @@ function entityCard(d) {
   const addr = d.physical_address || {};
   const loc = [addr.city, addr.state_or_province_code].filter(Boolean).join(", ") || "\u2014";
   const fo = d.federal_obligations?.total || {};
+  // registration_status is a boolean in the API
+  const status = d.registration_status === true ? "Active"
+    : d.registration_status === false ? "Inactive"
+    : (d.registration_status || "\u2014");
   return {id: "entity:" + d.uei, html: `
     <div class="card">
       <span class="card-badge entity">Entity</span>
@@ -199,7 +234,7 @@ function entityCard(d) {
       <div class="card-ext"><a href="https://sam.gov/entities/view/${encodeURIComponent(d.uei)}/coreData" target="_blank" rel="noopener">SAM.gov &#x2197;</a></div>
       <div class="card-grid">
         <div><div class="field-label">Location</div><div class="field-value">${esc(loc)}</div></div>
-        <div><div class="field-label">Status</div><div class="field-value">${esc(d.registration_status || "\u2014")}</div></div>
+        <div><div class="field-label">Status</div><div class="field-value">${esc(status)}</div></div>
         <div><div class="field-label">Primary NAICS</div><div class="field-value">${esc(d.primary_naics || "\u2014")}</div></div>
         <div><div class="field-label">Website</div><div class="field-value">${safeUrl(d.entity_url)}</div></div>
         <div><div class="field-label">Awards</div><div class="field-value">${fmt(fo.awards_count || 0)} awards</div></div>
