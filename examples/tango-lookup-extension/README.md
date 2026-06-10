@@ -7,6 +7,7 @@ A Chrome extension for quick lookups of federal contracts, entities, and opportu
 ## Features
 
 - Search by UEI, PIID, solicitation number, award key, or name
+- Full-text opportunity search — "Golden Dome" finds the Golden Dome CSO, not just exact solicitation-number matches
 - View entity, contract, IDV, and opportunity details in a compact card UI
 - Expand any result to see the full API response
 - Right-click context menu to look up selected text

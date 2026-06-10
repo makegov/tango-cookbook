@@ -162,12 +162,17 @@ async function doLookup(q) {
   const seen = new Set();
   function addCard(c) { if (c && !seen.has(c.id)) { seen.add(c.id); cards.push(c); } }
 
-  // Phase 1: resolver for entities + exact lookups for awards/opportunities
-  const [resolved, con, idv, sol] = await Promise.all([
+  // Phase 1: resolver for entities + exact lookups for awards + opportunity
+  // search. Opportunities are searched by text here (not just exact
+  // solicitation number) — entity fuzzy-matches almost always return
+  // *something*, so an opportunities search gated behind "no other hits"
+  // would never run for queries like "Golden Dome".
+  const [resolved, con, idv, sol, oppText] = await Promise.all([
     apiPost("/api/resolve/", {name: q, target_type: "entity"}).catch(() => null),
     apiFetch("/api/contracts/" + encodeURIComponent(q) + "/?shape=" + CONTRACT_SHAPE).catch(() => null),
     apiFetch("/api/idvs/" + encodeURIComponent(q) + "/?shape=" + IDV_SHAPE).catch(() => null),
     apiFetch("/api/opportunities/?solicitation_number=" + encodeURIComponent(q) + "&shape=" + OPPORTUNITY_SHAPE).catch(() => null),
+    apiFetch("/api/opportunities/?search=" + encodeURIComponent(q) + "&shape=" + OPPORTUNITY_SHAPE).catch(() => null),
   ]);
 
   // Fetch full entity details for each resolver candidate
@@ -183,19 +188,19 @@ async function doLookup(q) {
   if (con) addCard(awardCard(con, "contract"));
   if (idv) addCard(awardCard(idv, "idv"));
   if (sol?.results) sol.results.slice(0, 5).forEach(d => addCard(opportunityCard(d)));
+  if (oppText?.results) oppText.results.slice(0, 5).forEach(d => addCard(opportunityCard(d)));
 
   if (thisLookup !== lookupId) return;
 
-  // Phase 2: text search for awards/opportunities if no hits yet
+  // Phase 2: text search for awards if no hits yet (opportunities already
+  // text-searched in phase 1)
   if (cards.length === 0) {
-    const [sCon, sIdv, sOpp] = await Promise.all([
+    const [sCon, sIdv] = await Promise.all([
       apiFetch("/api/contracts/?search=" + encodeURIComponent(q) + "&shape=" + CONTRACT_SHAPE).catch(() => null),
       apiFetch("/api/idvs/?search=" + encodeURIComponent(q) + "&shape=" + IDV_SHAPE).catch(() => null),
-      apiFetch("/api/opportunities/?search=" + encodeURIComponent(q) + "&shape=" + OPPORTUNITY_SHAPE).catch(() => null),
     ]);
     if (sCon?.results) sCon.results.slice(0, 5).forEach(d => addCard(awardCard(d, "contract")));
     if (sIdv?.results) sIdv.results.slice(0, 5).forEach(d => addCard(awardCard(d, "idv")));
-    if (sOpp?.results) sOpp.results.slice(0, 5).forEach(d => addCard(opportunityCard(d)));
   }
 
   if (thisLookup !== lookupId) return;
