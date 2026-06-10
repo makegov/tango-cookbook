@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Tango Lookup</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f5f5f5;
+        color: #1a1a1a;
+        width: 420px;
+        min-height: 100px;
+        padding: 1rem;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+      .header h1 { font-size: 1rem; font-weight: 600; color: #333; }
+      .env-bar {
+        display: flex;
+        gap: 0.35rem;
+        margin-left: auto;
+      }
+      .env-btn {
+        font-size: 0.65rem;
+        padding: 2px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      .env-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+      .env-btn:hover:not(.active) { background: #eee; }
+      .search-box {
+        width: 100%;
+        padding: 0.5rem 0.6rem;
+        font-size: 0.9rem;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        outline: none;
+        margin-bottom: 0.75rem;
+      }
+      .search-box:focus { border-color: #4a90d9; box-shadow: 0 0 0 2px rgba(74,144,217,0.15); }
+      .status { color: #666; font-size: 0.8rem; margin-bottom: 0.5rem; }
+      .status a { color: #1565c0; cursor: pointer; text-decoration: none; }
+      .status a:hover { text-decoration: underline; }
+      .card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      }
+      .card-badge {
+        font-size: 0.6rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #fff;
+        padding: 1px 5px;
+        border-radius: 3px;
+        display: inline-block;
+        margin-bottom: 0.4rem;
+      }
+      .card-badge.entity { background: #2e7d32; }
+      .card-badge.contract { background: #1565c0; }
+      .card-badge.idv { background: #6a1b9a; }
+      .card-badge.opportunity { background: #e65100; }
+      .card-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 0.3rem;
+        word-break: break-word;
+      }
+      .card-id {
+        font-size: 0.7rem;
+        color: #666;
+        font-family: "SF Mono", SFMono-Regular, Menlo, monospace;
+        margin-bottom: 0.5rem;
+      }
+      .card-ext {
+        font-size: 0.7rem;
+        margin-bottom: 0.5rem;
+      }
+      .card-ext a { color: #888; text-decoration: none; }
+      .card-ext a:hover { color: #1565c0; text-decoration: underline; }
+      .card-desc {
+        font-size: 0.8rem;
+        color: #444;
+        margin-bottom: 0.5rem;
+        line-height: 1.4;
+      }
+      .card-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.35rem 0.75rem;
+      }
+      .field-label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #999;
+        font-weight: 600;
+      }
+      .field-value {
+        font-size: 0.8rem;
+        color: #333;
+      }
+      .field-value a { color: #1565c0; text-decoration: none; cursor: pointer; }
+      .field-value a:hover { text-decoration: underline; }
+      .expand-btn {
+        font-size: 0.7rem;
+        color: #888;
+        background: none;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 2px 6px;
+        cursor: pointer;
+        margin-top: 0.5rem;
+      }
+      .expand-btn:hover { color: #333; border-color: #bbb; }
+      .raw-json {
+        margin-top: 0.5rem;
+        background: #f8f8f8;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1.4;
+        overflow-x: auto;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: normal;
+        display: none;
+      }
+      .raw-json.open { display: block; }
+      .kv-row {
+        display: flex;
+        gap: 0.4rem;
+        padding: 2px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .kv-row:last-child { border-bottom: none; }
+      .kv-label {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #666;
+        text-transform: capitalize;
+        min-width: 100px;
+        flex-shrink: 0;
+      }
+      .kv-value {
+        font-size: 0.75rem;
+        color: #333;
+        word-break: break-word;
+      }
+      .kv-group {
+        margin: 4px 0 4px 8px;
+        padding-left: 8px;
+        border-left: 2px solid #ddd;
+      }
+      .kv-group-label {
+        font-size: 0.65rem;
+        font-weight: 600;
+        color: #888;
+        text-transform: capitalize;
+        margin: 4px 0 2px;
+        cursor: pointer;
+      }
+      .kv-group-label:hover { color: #333; }
+      .kv-group.collapsed > .kv-row,
+      .kv-group.collapsed > .kv-group { display: none; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Tango Lookup</h1>
+      <div class="env-bar" id="envBar"></div>
+    </div>
+    <label for="searchBox" class="sr-only">Search by UEI, PIID, solicitation number, award key, or name</label>
+    <input class="search-box" id="searchBox" type="text" placeholder="UEI, PIID, solicitation #, award key, or name" autofocus>
+    <div class="status" id="status"></div>
+    <div id="results"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
