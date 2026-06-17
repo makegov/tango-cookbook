@@ -2,6 +2,8 @@
 
 Recipes and reference apps for the [Tango API](https://tango.makegov.com), primarily via the [`tango-python`](https://pypi.org/project/tango-python/) SDK. Everything here runs against the live API; notebooks are re-executed nightly in CI, so what you see is what runs.
 
+**▶ [Watch the 2-minute tour](https://youtu.be/A3VoMdVJt3Y)** — the Chrome extension, the USASpending-replacement notebook, and the automation examples, on live data.
+
 ## Two surfaces
 
 **[`notebooks/`](./notebooks/)** — self-contained Jupyter recipes that read top-to-bottom and render their outputs on GitHub. Read one, fork the cells you need.
