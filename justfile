@@ -37,7 +37,11 @@ refresh:
 
 # Run the opportunities agent example. Pass a question or use the default.
 agent *question:
-    uv run python examples/opportunities-agent/agent.py {{question}}
+    uv run python examples/opportunities-agent/agent.py {{ quote(question) }}
+
+# Run the same agent against a local OpenAI-compatible model (Ollama by default).
+local-agent *question:
+    uv run python examples/opportunities-agent/local_agent.py {{ quote(question) }}
 
 # Run the saved-search watcher once. Pass flags like --seed or --dry-run.
 watch *flags:
