@@ -41,15 +41,25 @@ just incumbent path/to/notice.json
 just incumbent-evals           # deterministic scorer invariants — no LLM key needed
 ```
 
-`just incumbent` needs `TANGO_API_KEY` (for the MCP server) **and** `ANTHROPIC_API_KEY` (for the model). `just incumbent-evals` needs only `TANGO_API_KEY`.
+`just incumbent` needs `TANGO_API_KEY` (for the MCP server) **and** a model — by default `ANTHROPIC_API_KEY` for the hosted Anthropic model, or a local server (see below). `just incumbent-evals` needs only `TANGO_API_KEY`.
 
 ### The notice shape
 
 The agent and scorer take an enriched notice — what a Tango opportunities webhook gives you, plus a `get_opportunity` lookup to fill in office/NAICS/PSC. See [`sample_notice.json`](./sample_notice.json). The field that matters most is `office_code`: pass the **most specific** awarding office, not the parent department. Department-level filtering (`VA`, `DHS`) returns noise — DHS alone has 22 components.
 
-## Hosted vs. local MCP
+## Running locally
 
-By default `brief.py` talks to the hosted server at `https://govcon.dev/mcp` with your key in the `X-Tango-API-Key` header. To run the [Tango MCP server](https://tango.makegov.com) locally over stdio instead, swap `MCPServerStreamableHTTP` for `MCPServerStdio`, or point `TANGO_MCP_URL` at your own deployment.
+There are two independent "local" axes here — the **MCP server** (where the Tango tools live) and the **model** (the LLM driving them). You can move either off the default without touching the other.
+
+**Local model.** By default the agent uses the hosted Anthropic model. To run it against any OpenAI-compatible server (LM Studio, Ollama, vLLM, …), set `OPENAI_BASE_URL` and `MODEL`; `ANTHROPIC_API_KEY` is then no longer required:
+
+```bash
+OPENAI_BASE_URL=http://localhost:1234/v1 MODEL=your-served-model-id just incumbent
+```
+
+Pick a model that does real tool-calling — this agent lives or dies on driving the Tango MCP tools, so a model that can't reliably emit tool calls will just return an empty brief.
+
+**Local MCP server.** By default `brief.py` talks to the hosted server at `https://govcon.dev/mcp` with your key in the `X-Tango-API-Key` header. To run the [Tango MCP server](https://tango.makegov.com) locally over stdio instead, swap `MCPServerStreamableHTTP` for `MCPServerStdio`, or point `TANGO_MCP_URL` at your own deployment.
 
 ## Wiring it to a real trigger
 
