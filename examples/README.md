@@ -5,6 +5,7 @@ More ambitious patterns built on the Tango API. Where [`notebooks/`](../notebook
 | Example | What it shows |
 | --- | --- |
 | [`opportunities-agent/`](./opportunities-agent/) | A minimal Claude tool-use loop that lets you ask plain-English questions about federal opportunities. |
+| [`incumbent-on-post/`](./incumbent-on-post/) | When a new opportunity posts, brief the likely incumbent, prior award, and funding — a PydanticAI agent over the Tango MCP, plus a deterministic scorer and evals. The repo's first MCP integration. |
 | [`saved-search-watcher/`](./saved-search-watcher/) | A YAML-driven watcher: pull a saved search on a schedule, diff against a JSON state file, alert on what's new. |
 | [`tango-lookup-extension/`](./tango-lookup-extension/) | A Chrome extension (Manifest V3, vanilla JS) for quick lookups of entities, contracts, IDVs, and opportunities from the toolbar. |
 | [`webhook-receiver/`](./webhook-receiver/) | A FastAPI app that accepts Tango webhook deliveries — signature-verified, idempotent, with a pluggable sink. |

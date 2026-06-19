@@ -43,6 +43,14 @@ agent *question:
 watch *flags:
     uv run python examples/saved-search-watcher/watcher.py {{flags}}
 
+# Brief the likely incumbent on a new opportunity (PydanticAI agent over the Tango MCP).
+incumbent *notice:
+    uv run python examples/incumbent-on-post/brief.py {{notice}}
+
+# Run the deterministic-scorer invariant evals for incumbent-on-post (no LLM key needed).
+incumbent-evals:
+    uv run python examples/incumbent-on-post/evals.py
+
 # Start the webhook receiver on :8000.
 webhook-serve:
     uv run uvicorn examples.webhook-receiver.server:app --reload --port 8000 --host 0.0.0.0

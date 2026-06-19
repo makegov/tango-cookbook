@@ -1,0 +1,68 @@
+<svg viewBox="0 0 860 612" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" role="img" aria-labelledby="ttl dsc">
+  <title id="ttl">incumbent-on-post pipeline</title>
+  <desc id="dsc">One new SAM.gov notice is pivoted on the contracting office, run through a deterministic scorer and a PydanticAI agent over the Tango MCP, and resolved into a typed ranked IncumbentBrief.</desc>
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#888780"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="860" height="612" fill="#FAFAF7"/>
+
+  <text x="32" y="40" font-size="17" font-weight="500" fill="#2C2C2A">incumbent-on-post</text>
+  <text x="32" y="59" font-size="12" fill="#5F5E5A">one new notice, three answers — who's the incumbent, what was the award, is the money still flowing</text>
+
+  <rect x="280" y="78" width="300" height="56" rx="8" fill="#F1EFE8" stroke="#B4B2A9"/>
+  <text x="430" y="101" font-size="13" font-weight="500" fill="#2C2C2A" text-anchor="middle">new SAM.gov notice</text>
+  <text x="430" y="120" font-size="11" fill="#5F5E5A" text-anchor="middle">36C25026R0042 · VA NCO 5 · NAICS 561492 · SDVOSBC</text>
+
+  <line x1="430" y1="134" x2="430" y2="154" stroke="#888780" stroke-width="1.5" marker-end="url(#arw)"/>
+
+  <rect x="168" y="158" width="524" height="46" rx="8" fill="#FAEEDA" stroke="#EF9F27"/>
+  <text x="430" y="180" font-size="12.5" font-weight="500" fill="#633806" text-anchor="middle">fresh solicitation # never matches the prior award #</text>
+  <text x="430" y="197" font-size="11.5" fill="#854F0B" text-anchor="middle">so pivot on the contracting office — the thing that persists across a recompete</text>
+
+  <line x1="430" y1="204" x2="262" y2="234" stroke="#888780" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="430" y1="204" x2="598" y2="234" stroke="#888780" stroke-width="1.5" marker-end="url(#arw)"/>
+
+  <rect x="112" y="236" width="300" height="98" rx="8" fill="#E1F5EE" stroke="#5DCAA5"/>
+  <text x="130" y="260" font-size="12.5" font-weight="500" fill="#085041">deterministic scorer · scorer.py</text>
+  <text x="130" y="282" font-size="11.5" fill="#0F6E56">rank by expiry window × dollars × recurrence</text>
+  <text x="130" y="301" font-size="11.5" fill="#0F6E56">bounded server-side: expiring_gte / lte</text>
+  <text x="130" y="320" font-size="11.5" fill="#0F6E56">reproducible · eval-able · no LLM</text>
+
+  <rect x="448" y="236" width="300" height="98" rx="8" fill="#EEEDFE" stroke="#AFA9EC"/>
+  <text x="466" y="260" font-size="12.5" font-weight="500" fill="#3C3489">PydanticAI agent → Tango MCP · brief.py</text>
+  <text x="466" y="282" font-size="11.5" fill="#534AB7">resolve · search · get_details</text>
+  <text x="466" y="301" font-size="11.5" fill="#534AB7">scope-match judgment over the PWS text</text>
+  <text x="466" y="320" font-size="11.5" fill="#534AB7">typed output · the repo's first MCP wiring</text>
+
+  <line x1="262" y1="334" x2="404" y2="368" stroke="#888780" stroke-width="1.5" marker-end="url(#arw)"/>
+  <line x1="598" y1="334" x2="456" y2="368" stroke="#888780" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text x="430" y="356" font-size="10.5" fill="#5F5E5A" text-anchor="middle">both independently agree on the top pick</text>
+
+  <rect x="150" y="372" width="560" height="208" rx="10" fill="#FFFFFF" stroke="#B4B2A9"/>
+  <text x="170" y="398" font-size="14" font-weight="500" fill="#2C2C2A">IncumbentBrief</text>
+  <rect x="556" y="385" width="134" height="20" rx="10" fill="#F1EFE8" stroke="#D3D1C7"/>
+  <text x="623" y="399" font-size="10.5" fill="#444441" text-anchor="middle">ranked · never one name</text>
+
+  <text x="172" y="428" font-size="12.5" fill="#2C2C2A">1 · Vet Reporting LLC</text>
+  <rect x="330" y="416" width="46" height="18" rx="9" fill="#EAF3DE"/>
+  <text x="353" y="429" font-size="10.5" font-weight="500" fill="#27500A" text-anchor="middle">high</text>
+  <text x="392" y="428" font-size="11" fill="#5F5E5A">~$500K IDIQ 36C24524A0013 · recompete 2029-02-07</text>
+
+  <text x="172" y="458" font-size="12.5" fill="#2C2C2A">2 · Jamison Professional Services</text>
+  <rect x="330" y="446" width="62" height="18" rx="9" fill="#FAEEDA"/>
+  <text x="361" y="459" font-size="10.5" font-weight="500" fill="#854F0B" text-anchor="middle">medium</text>
+  <text x="402" y="458" font-size="11" fill="#5F5E5A">parallel VISN 5 court-reporter IDIQ</text>
+
+  <text x="172" y="488" font-size="12.5" fill="#2C2C2A">3 · The Ravens Group</text>
+  <rect x="330" y="476" width="46" height="18" rx="9" fill="#E8E6DE"/>
+  <text x="353" y="489" font-size="10.5" font-weight="500" fill="#444441" text-anchor="middle">low</text>
+  <text x="392" y="488" font-size="11" fill="#5F5E5A">SAC Frederick bridge to Nov 2026</text>
+
+  <line x1="170" y1="506" x2="690" y2="506" stroke="#E8E6DE" stroke-width="1"/>
+  <rect x="170" y="516" width="3" height="16" fill="#1D9E75"/>
+  <text x="182" y="528" font-size="11.5" fill="#0F6E56">funding · VHA Medical Support &amp; Compliance 036-0152 · enacted −3% · obligating on pace</text>
+  <text x="170" y="554" font-size="11" fill="#5F5E5A">or — likely new work · no clear predecessor (a valid, first-class answer)</text>
+</svg>

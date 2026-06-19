@@ -27,6 +27,7 @@ Recipes and reference apps for the [Tango API](https://tango.makegov.com), prima
 | Example | What it shows |
 | --- | --- |
 | [`opportunities-agent`](./examples/opportunities-agent/) | A minimal Claude tool-use loop that answers plain-English questions about federal opportunities. |
+| [`incumbent-on-post`](./examples/incumbent-on-post/) | A new opportunity posts → brief the likely incumbent, prior award, and funding. A PydanticAI agent over the Tango MCP (the repo's first MCP integration), hardened with a deterministic scorer + evals. |
 | [`saved-search-watcher`](./examples/saved-search-watcher/) | A YAML-driven watcher: poll a saved search on a schedule, diff against a JSON state file, alert on what's new. |
 | [`webhook-receiver`](./examples/webhook-receiver/) | A FastAPI app that accepts Tango webhook deliveries — signature-verified, idempotent, with a pluggable sink. |
 
