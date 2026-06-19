@@ -20,7 +20,12 @@ Run:
     just incumbent                       # uses sample_notice.json
     just incumbent path/to/notice.json
 
-Requires TANGO_API_KEY (for the MCP server) and ANTHROPIC_API_KEY (for the model).
+Requires TANGO_API_KEY (for the MCP server) and a model:
+  - default: ANTHROPIC_API_KEY + the hosted Anthropic model.
+  - local / OpenAI-compatible: set OPENAI_BASE_URL (e.g. http://localhost:1234/v1 for
+    LM Studio or Ollama) and MODEL to the served model id. Pick a model that does
+    real tool-calling — this agent lives or dies on driving the Tango MCP tools.
+
 Not run in CI: it calls a paid LLM and a live API, and the output is non-deterministic.
 """
 
@@ -36,8 +41,12 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStreamableHTTP
+from pydantic_ai.models import Model
 
-MODEL = "anthropic:claude-sonnet-4-6"
+# Default to the hosted Anthropic model. Override with MODEL, and point at any
+# OpenAI-compatible server (LM Studio, Ollama, vLLM, ...) by setting OPENAI_BASE_URL.
+MODEL = os.environ.get("MODEL", "anthropic:claude-sonnet-4-6")
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL")
 TANGO_MCP_URL = os.environ.get("TANGO_MCP_URL", "https://govcon.dev/mcp")
 
 
@@ -142,11 +151,25 @@ say so in `notes` rather than inflating the shortlist.
 """
 
 
+def build_model() -> str | Model:
+    """A model spec for the Agent. A plain provider:id string for hosted models, or an
+    OpenAI-compatible Model when OPENAI_BASE_URL points at a local/self-hosted server."""
+    if not OPENAI_BASE_URL:
+        return MODEL
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+
+    # Strip a leading "openai:" if present — the provider already implies it.
+    model_id = MODEL.split(":", 1)[1] if MODEL.startswith("openai:") else MODEL
+    provider = OpenAIProvider(base_url=OPENAI_BASE_URL, api_key=os.environ.get("OPENAI_API_KEY", "not-needed"))
+    return OpenAIChatModel(model_id, provider=provider)
+
+
 def build_agent() -> Agent[None, IncumbentBrief]:
     api_key = os.environ["TANGO_API_KEY"]
     tango_mcp = MCPServerStreamableHTTP(TANGO_MCP_URL, headers={"X-Tango-API-Key": api_key})
     return Agent(
-        MODEL,
+        build_model(),
         toolsets=[tango_mcp],
         output_type=IncumbentBrief,
         instructions=INSTRUCTIONS,
@@ -169,7 +192,10 @@ async def run(notice: dict) -> IncumbentBrief:
 
 
 def main() -> None:
-    for var in ("TANGO_API_KEY", "ANTHROPIC_API_KEY"):
+    required = ["TANGO_API_KEY"]
+    if not OPENAI_BASE_URL:  # hosted Anthropic default needs a key; a local server doesn't
+        required.append("ANTHROPIC_API_KEY")
+    for var in required:
         if not os.environ.get(var):
             sys.exit(f"missing {var} — see .env.example")
 
