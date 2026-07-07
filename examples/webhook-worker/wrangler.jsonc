@@ -1,0 +1,24 @@
+{
+  // Cloudflare Worker config. The "Deploy to Cloudflare" button in the README
+  // reads this file: it creates the Worker, provisions the KV namespace below,
+  // and (in the newer setup flow) prompts for the two secrets. See the README
+  // for the manual path.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tango-webhook-slack",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true },
+
+  // Idempotency store, keyed by delivery_id. The Deploy button fills in `id`
+  // when it provisions the namespace. For a manual deploy, run:
+  //   npx wrangler kv namespace create SEEN_DELIVERIES
+  // and paste the returned id here. `wrangler dev` simulates KV locally, so the
+  // id can stay empty while developing.
+  "kv_namespaces": [
+    { "binding": "SEEN_DELIVERIES", "id": "" }
+  ]
+
+  // Secrets are NOT stored here (they'd land in git). Set them after deploy:
+  //   npx wrangler secret put TANGO_WEBHOOK_SECRET
+  //   npx wrangler secret put SLACK_WEBHOOK_URL
+}

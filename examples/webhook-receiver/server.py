@@ -34,28 +34,45 @@ from tango.webhooks import SIGNATURE_HEADER, verify_signature
 
 SECRET = os.environ.get("TANGO_WEBHOOK_SECRET")
 SINK = os.environ.get("WEBHOOK_SINK", "stdout")
-SEEN_CAP = 10_000  # how many recent event ids to remember for idempotency
+SEEN_CAP = 10_000  # how many recent delivery ids to remember for idempotency
 
 app = FastAPI(title="Tango webhook receiver")
 _seen: "OrderedDict[str, None]" = OrderedDict()
 
 
 # --- Sinks ---------------------------------------------------------------------
-# Each takes the parsed event dict and emits it somewhere. Replace or add as
-# needed; this is the only file you should have to touch to route events.
+# A delivery is a batch envelope: a top-level `delivery_id` plus an `events[]`
+# array. Each sink takes one event dict — the handler loops the batch and calls
+# the sink per event. This is the only place you should have to touch to route
+# events. See the Webhooks payload format §6 for the full shape.
 
-def emit_stdout(event_type: str, event: dict[str, Any]) -> None:
-    summary = {k: event.get(k) for k in ("event_id", "id", "occurred_at", "alert_id") if event.get(k)}
-    print(f"[{event_type}] {json.dumps(summary, default=str)}")
+def _match_counts(event: dict[str, Any]) -> tuple[int, int]:
+    m = event.get("matches") or {}
+    new = m.get("new_count", len(m.get("new", [])))
+    modified = m.get("modified_count", len(m.get("modified", [])))
+    return new, modified
 
 
-def emit_slack(event_type: str, event: dict[str, Any]) -> None:
+def emit_stdout(event: dict[str, Any]) -> None:
+    new, modified = _match_counts(event)
+    summary = {
+        "event_type": event.get("event_type"),
+        "alert_id": event.get("alert_id"),
+        "new": new,
+        "modified": modified,
+    }
+    print(json.dumps(summary, default=str))
+
+
+def emit_slack(event: dict[str, Any]) -> None:
     url = os.environ.get("SLACK_WEBHOOK_URL")
     if not url:
         print("SLACK_WEBHOOK_URL not set — falling back to stdout", file=sys.stderr)
-        emit_stdout(event_type, event)
+        emit_stdout(event)
         return
-    text = f"*{event_type}* — `{event.get('event_id') or event.get('id') or '?'}`"
+    new, modified = _match_counts(event)
+    alert = (event.get("alert_id") or "?")[:8]
+    text = f"*{event.get('event_type') or 'match'}* — {new} new, {modified} modified (alert `{alert}`)"
     payload = json.dumps({"text": text}).encode()
     req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=10) as resp:
@@ -67,15 +84,16 @@ SINKS = {"stdout": emit_stdout, "slack": emit_slack}
 
 
 # --- Idempotency ---------------------------------------------------------------
-# Tango will retry on non-2xx. We dedupe by event_id so a redelivery is a no-op.
-# Replace this in-memory LRU with Redis / a DB when you run >1 process.
+# Tango retries on non-2xx, and a retried dispatch reuses its `delivery_id`, so
+# we dedupe by delivery_id and a redelivery becomes a no-op. Replace this
+# in-memory LRU with Redis / a DB when you run >1 process.
 
-def _already_seen(event_id: str | None) -> bool:
-    if not event_id:
+def _already_seen(delivery_id: str | None) -> bool:
+    if not delivery_id:
         return False
-    if event_id in _seen:
+    if delivery_id in _seen:
         return True
-    _seen[event_id] = None
+    _seen[delivery_id] = None
     if len(_seen) > SEEN_CAP:
         _seen.popitem(last=False)
     return False
@@ -95,24 +113,25 @@ async def receive(request: Request) -> dict[str, str]:
         raise HTTPException(401, "bad signature")
 
     try:
-        event = json.loads(body)
+        delivery = json.loads(body)
     except json.JSONDecodeError as e:
         raise HTTPException(400, f"invalid JSON: {e}")
 
-    event_id = event.get("event_id") or event.get("id")
-    if _already_seen(event_id):
+    delivery_id = delivery.get("delivery_id")
+    if _already_seen(delivery_id):
         # Idempotent. Return 200 so Tango stops retrying.
-        return {"status": "duplicate", "event_id": event_id}
+        return {"status": "duplicate", "delivery_id": delivery_id or ""}
 
-    event_type = event.get("event_type") or event.get("type") or "unknown"
+    # A delivery batches one or more events; route each through the sink.
     sink = SINKS.get(SINK, emit_stdout)
     try:
-        sink(event_type, event)
+        for event in delivery.get("events", []):
+            sink(event)
     except Exception as e:
         # Returning a 5xx makes Tango retry — usually what you want for sink errors.
         raise HTTPException(500, f"sink failed: {type(e).__name__}: {e}")
 
-    return {"status": "ok", "event_id": event_id or ""}
+    return {"status": "ok", "delivery_id": delivery_id or ""}
 
 
 @app.get("/healthz")

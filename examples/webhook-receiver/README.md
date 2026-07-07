@@ -56,16 +56,16 @@ just webhook-serve
                                             │
                                             ▼
                                       verify sig
-                                      dedupe by event_id
-                                      route by event_type
+                                      dedupe by delivery_id
+                                      fan out events[] to sink
 ```
 
-Each delivery:
+Each delivery is a batch envelope — a top-level `delivery_id` and an `events[]` array (see the [Webhooks payload format §6](https://tango.makegov.com)). The receiver:
 
-1. The receiver reads the raw body and the `X-Tango-Signature` header.
+1. Reads the raw body and the `X-Tango-Signature` header.
 2. [`tango.webhooks.verify_signature`](https://pypi.org/project/tango-python/) does a constant-time HMAC-SHA256 compare against `TANGO_WEBHOOK_SECRET`. Mismatch → `401`.
-3. The event's `event_id` is checked against an in-memory LRU. Dupes return `200` with `status: "duplicate"` so Tango stops retrying.
-4. The configured sink emits the event. Sink failure → `500` so Tango will retry.
+3. Checks the top-level `delivery_id` against an in-memory LRU. Tango retries on non-2xx and a retried dispatch reuses its `delivery_id`, so dupes return `200` with `status: "duplicate"` and Tango stops retrying.
+4. Loops `events[]` and hands each event to the configured sink. Sink failure → `500` so Tango will retry.
 
 That's it. The whole receiver is in [`server.py`](./server.py) — `emit_stdout` and `emit_slack` are the only functions you'll usually edit.
 
@@ -76,7 +76,7 @@ That's it. The whole receiver is in [`server.py`](./server.py) — `emit_stdout`
 - **Per-event-type routing.** Right now every event goes to the same sink. Branch on `event_type` to send opportunity matches to one Slack channel and protest matches to another.
 - **Backpressure.** If your sink is slow (e.g. an LLM summarization step), `await` is fine for a while, but at some point you want to ack fast and enqueue. Push events onto a queue (SQS, Redis Streams, Postgres `LISTEN/NOTIFY`) and process out of band.
 - **Multiple alerts.** [`register.py`](./register.py) sets up one example alert. Add more by calling `tango.create_webhook_alert(...)` repeatedly — different `name`, `query_type`, `filters`. One endpoint can fan in many alerts.
-- **Deploy.** This runs anywhere Uvicorn does — Fly.io, Render, Railway, Cloud Run, an EC2 instance, a Pi. For something this small, a single-instance ASGI deploy with a managed TLS cert is plenty.
+- **Deploy.** This runs anywhere Uvicorn does — Fly.io, Render, Railway, Cloud Run, an EC2 instance, a Pi. For something this small, a single-instance ASGI deploy with a managed TLS cert is plenty. If you just want matches in Slack with no host at all, [`../webhook-worker/`](../webhook-worker/) is the same idea as a one-click Cloudflare Worker.
 
 ## Caveats
 

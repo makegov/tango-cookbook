@@ -1,0 +1,16 @@
+{
+  "name": "tango-webhook-slack",
+  "private": true,
+  "type": "module",
+  "description": "Deploy-button Cloudflare Worker that turns Tango webhook deliveries into Slack messages.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "smoke": "node smoke.mjs",
+    "register": "node register.mjs"
+  },
+  "devDependencies": {
+    "@makegov/tango-node": "^1.1.0",
+    "wrangler": "^3"
+  }
+}
