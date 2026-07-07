@@ -70,15 +70,16 @@ def main() -> int:
     print()
 
     # Wire one example alert so the endpoint actually receives something.
-    # Customize `filters` to whatever you care about; this mirrors the
-    # saved-search-watcher's "small IT recompetes" profile.
+    # `query_type` is singular (`opportunity`, not `opportunities`) and must be
+    # one of the values in the webhooks docs; `filters` are the same parameters
+    # you'd pass to GET /api/opportunities/. Customize both to whatever you care
+    # about — add `agency`, `set_aside`, `psc`, etc. once you've confirmed the
+    # values validate against the opportunities endpoint.
     alert = tango.create_webhook_alert(
-        name="cookbook example — small IT recompetes",
-        query_type="opportunities",
+        name="cookbook example — IT services opportunities",
+        query_type="opportunity",
         filters={
             "naics": "541512",
-            "set_aside": "SBA",
-            "notice_type": "o",
             "active": True,
         },
         frequency="realtime",

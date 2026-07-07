@@ -9,6 +9,7 @@ More ambitious patterns built on the Tango API. Where [`notebooks/`](../notebook
 | [`saved-search-watcher/`](./saved-search-watcher/) | A YAML-driven watcher: pull a saved search on a schedule, diff against a JSON state file, alert on what's new. |
 | [`tango-lookup-extension/`](./tango-lookup-extension/) | A Chrome extension (Manifest V3, vanilla JS) for quick lookups of entities, contracts, IDVs, and opportunities from the toolbar. |
 | [`webhook-receiver/`](./webhook-receiver/) | A FastAPI app that accepts Tango webhook deliveries — signature-verified, idempotent, with a pluggable sink. |
+| [`webhook-worker/`](./webhook-worker/) | The easy button: a one-click "Deploy to Cloudflare" Worker that posts Tango alert matches to Slack. Zero infrastructure — no server, no tunnel, no SDK. A dependency-free JS Worker (not Python). |
 
 ## Conventions
 

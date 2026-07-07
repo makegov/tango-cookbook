@@ -58,3 +58,20 @@ webhook-serve:
 # Register a Tango webhook endpoint + sample alert against a public callback URL.
 webhook-register url:
     uv run python examples/webhook-receiver/register.py {{url}}
+
+# webhook-worker (Cloudflare Worker → Slack). Run `npm install` in the dir first.
+# Offline check: sign the sample delivery, assert parsing + Slack blocks.
+webhook-worker-smoke:
+    cd examples/webhook-worker && node smoke.mjs
+
+# Local dev server with simulated KV (put secrets in a gitignored .dev.vars).
+webhook-worker-dev:
+    cd examples/webhook-worker && npx wrangler dev
+
+# Deploy to your Cloudflare account (after `npm install` + `wrangler secret put`).
+webhook-worker-deploy:
+    cd examples/webhook-worker && npx wrangler deploy
+
+# Register a Tango endpoint + alert against the deployed Worker URL (Node SDK).
+webhook-worker-register url:
+    cd examples/webhook-worker && node register.mjs {{url}}

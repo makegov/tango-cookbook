@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-07-06T14:03:11Z",
+  "delivery_id": "3f1c9a7e-2b4d-4a1f-8c6e-9d0a1b2c3d4e",
+  "events": [
+    {
+      "event_type": "alerts.opportunity.match",
+      "created_at": "2026-07-06T14:03:10.221Z",
+      "alert_id": "e4c4a1b2-3c4d-5e6f-7a8b-9c0d1e2f3a4b",
+      "query_type": "opportunity",
+      "filters": { "agency": "7500", "naics": "541512", "active": true },
+      "matches": {
+        "new_count": 2,
+        "modified_count": 0,
+        "new": [
+          {
+            "opportunity_id": "a1b2c3d4-0000-1111-2222-333344445555",
+            "title": "IT Support Services for the Office of the CIO",
+            "solicitation_number": "75H70126R00042",
+            "naics_code": "541512",
+            "response_deadline": "2026-08-01"
+          },
+          {
+            "opportunity_id": "b2c3d4e5-6666-7777-8888-99990000aaaa",
+            "title": "Enterprise Cloud Migration and O&M",
+            "solicitation_number": "75H70126R00043",
+            "naics_code": "541512",
+            "response_deadline": "2026-08-14"
+          }
+        ],
+        "modified": [],
+        "new_ids": [
+          "a1b2c3d4-0000-1111-2222-333344445555",
+          "b2c3d4e5-6666-7777-8888-99990000aaaa"
+        ],
+        "modified_ids": []
+      },
+      "checked_at": "2026-07-06T14:03:10.000Z"
+    }
+  ]
+}
