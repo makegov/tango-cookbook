@@ -32,9 +32,15 @@ const MAX_REQUIREMENTS = 40;   // similar requirements scanned per pass (open, c
 const MAX_FILES_PER_REQ = 10;  // file attachments downloaded per requirement
 const MAX_FILE_MB = 30;        // skip larger files (UrlFetchApp's hard limit is 50MB)
 const MAX_WINNERS_PER_REQ = 5; // awards matched per solicitation (MATOCs have several)
+const MAX_WINNER_LOOKUPS = 25; // closed requirements beyond the doc pulls to award-match
+const MAX_EVIDENCE_AWARDS = 150; // broader market awards pulled for the vendor rollup
+const MEMO_VENDOR_ROWS = 15;   // vendors tabled in the memo (full list on the Vendors tab)
 const EXCERPT_CHARS = 450;     // notice text quoted per requirement in the memo
 
-const SHEETS = {research: "Research", index: "Doc Index"};
+const EVIDENCE_SHAPE = "key,piid,award_date,obligated,set_aside(*)," +
+  "recipient(uei,display_name),awarding_office(*),naics(*)";
+
+const SHEETS = {research: "Research", index: "Doc Index", vendors: "Vendors"};
 
 // ---------------------------------------------------------------- menu --
 
@@ -121,14 +127,25 @@ function runMarketResearch() {
     entries.push(pullRequirement_(targets[i], folder));
   }
 
-  ss.toast("Drafting the memo…", "Tango", -1);
-  const memoUrl = buildMemo_(q, entries, found, folder);
+  ss.toast("Matching awards to requirements…", "Tango", -1);
+  const others = matchOtherWinners_(found.slice(q.docPulls));
 
-  writeIndex_(entries, found.slice(q.docPulls));
-  writeSummary_(q, found, entries, folder.getUrl(), memoUrl);
+  ss.toast("Pulling broader award evidence…", "Tango", -1);
+  const evidence = tangoList_("/api/contracts/", {
+    search: q.search, naics: q.naics, psc: q.psc, awarding_agency: q.agency,
+    award_date_gte: q.since, shape: EVIDENCE_SHAPE,
+  }, MAX_EVIDENCE_AWARDS);
+  const vendors = rollupVendors_(evidence);
+
+  ss.toast("Drafting the memo…", "Tango", -1);
+  const memoUrl = buildMemo_(q, entries, others, found, folder, vendors, evidence.length);
+
+  writeIndex_(entries, others);
+  writeVendors_(vendors);
+  writeSummary_(q, found, entries, vendors, folder.getUrl(), memoUrl);
   ss.setActiveSheet(ss.getSheetByName(SHEETS.index));
   const files = entries.reduce((s, e) => s + e.files.length, 0);
-  ss.toast("Done — " + files + " documents across " + entries.length + " requirements. Memo drafted.", "Tango", 10);
+  ss.toast("Done — " + files + " documents, " + vendors.length + " vendors. Memo drafted.", "Tango", 10);
 }
 
 function readInputs_() {
@@ -257,10 +274,51 @@ function winnerQuery_(sol) {
   }
 }
 
+/** Award-matches the scanned requirements beyond the doc pulls. Open notices
+ *  can't have awards yet, so only closed ones spend lookups (capped). */
+function matchOtherWinners_(opps) {
+  const out = [];
+  let looked = 0;
+  for (const o of opps) {
+    let winners = [];
+    if (!o.active && looked < MAX_WINNER_LOOKUPS) {
+      winners = findWinners_(o.solicitation_number);
+      looked += 1;
+    }
+    out.push({opp: o, winners: winners});
+  }
+  return out;
+}
+
+/** Broader market evidence, grouped per vendor and ranked by dollars. */
+function rollupVendors_(awards) {
+  const byVendor = {};
+  for (const a of awards) {
+    const uei = (a.recipient && a.recipient.uei) || "";
+    const name = (a.recipient && a.recipient.display_name) || "(unknown vendor)";
+    const k = uei || name;
+    const v = byVendor[k] || (byVendor[k] = {
+      name: name, uei: uei, awards: 0, obligated: 0, lastAward: "",
+      agencies: {}, naics: {}, setAsides: {},
+    });
+    v.awards += 1;
+    v.obligated += Number(a.obligated) || 0;
+    if ((a.award_date || "") > v.lastAward) v.lastAward = a.award_date || "";
+    const office = a.awarding_office || {};
+    const agency = office.department_name || office.agency_name || "";
+    if (agency) v.agencies[agency] = true;
+    if (a.naics && a.naics.code) v.naics[a.naics.code] = true;
+    const sa = a.set_aside && (a.set_aside.code || a.set_aside.description);
+    if (sa) v.setAsides[sa] = true;
+  }
+  return Object.keys(byVendor).map((k) => byVendor[k])
+    .sort((x, y) => y.obligated - x.obligated);
+}
+
 // ----------------------------------------------------------------- memo --
 
 /** Drafts the memo Doc inside the evidence folder; returns its URL. */
-function buildMemo_(q, entries, found, folder) {
+function buildMemo_(q, entries, others, found, folder, vendors, evidenceCount) {
   const doc = DocumentApp.create("Market Research Memo — " + memoLabel_(q));
   const body = doc.getBody();
   const H = DocumentApp.ParagraphHeading;
@@ -282,13 +340,16 @@ function buildMemo_(q, entries, found, folder) {
   body.appendParagraph("2. Summary of findings").setHeading(H.HEADING1);
   const openCount = found.filter((o) => o.active).length;
   const fileCount = entries.reduce((s, e) => s + e.files.length, 0);
-  const withWinners = entries.filter((e) => e.winners.length);
+  const matched = entries.concat(others);
+  const withWinners = matched.filter((e) => e.winners.length);
   const setAsideCounts = countBy_(found, (o) => o.set_aside || "None / unspecified");
   const bullets = [
-    found.length + " similar requirements identified (" + openCount + " currently open), of the most recent " +
+    found.length + " similar requirements identified (" + openCount + " currently open); of the most recent " +
       entries.length + ", " + fileCount + " solicitation documents were retrieved as exhibits.",
-    "Awards were located for " + withWinners.length + " of " + entries.length +
-      " requirements examined, naming " + uniqueWinnerCount_(entries) + " distinct vendor(s) — see Section 4.",
+    "Awards were matched to " + withWinners.length + " requirements by solicitation number, naming " +
+      uniqueWinnerCount_(matched) + " distinct vendor(s) — see Section 4.",
+    "Broader market: " + vendors.length + " vendor(s) won " + evidenceCount +
+      " awards matching this market since " + q.since + ".",
     "Set-aside pattern across all " + found.length + " notices: " + setAsideSentence_(setAsideCounts) + ".",
   ];
   for (const b of bullets) body.appendListItem(b).setGlyphType(DocumentApp.GlyphType.BULLET);
@@ -330,20 +391,36 @@ function buildMemo_(q, entries, found, folder) {
   }
 
   body.appendParagraph("4. Vendor field").setHeading(H.HEADING1);
+
+  body.appendParagraph("Direct outcomes — awards matched to the requirements above").setHeading(H.HEADING2);
   const winnerRows = [["Vendor", "UEI", "Solicitation #", "Award date", "Obligated"]];
-  for (const e of entries) {
+  for (const e of matched) {
     for (const w of e.winners) {
       winnerRows.push([w.vendor, w.uei, e.opp.solicitation_number || "", w.awardDate, money_(w.obligated)]);
     }
   }
   if (winnerRows.length > 1) {
-    const table = body.appendTable(winnerRows);
-    for (let c = 0; c < winnerRows[0].length; c++) {
-      table.getRow(0).getCell(c).editAsText().setBold(true);
-    }
+    boldHeaderTable_(body, winnerRows);
   } else {
-    body.appendParagraph("No awards were matched to the examined requirements by solicitation number. " +
-      "Broaden the lookback, or search award history directly (see the market-research-sheet example).");
+    body.appendParagraph("No awards matched by solicitation number. Recently closed solicitations are often " +
+      "unawarded or not yet reported — FPDS can lag an award by up to 90 days. The broader evidence below " +
+      "covers the gap.");
+  }
+
+  body.appendParagraph("The broader vendor field — who wins this kind of work").setHeading(H.HEADING2);
+  if (vendors.length) {
+    body.appendParagraph("Across " + evidenceCount + " awards matching this market definition since " + q.since +
+      " (top " + Math.min(vendors.length, MEMO_VENDOR_ROWS) + " of " + vendors.length +
+      " vendors by obligated dollars — full list on the Vendors tab):");
+    const vendorRows = [["Vendor", "Awards", "Obligated", "Agencies", "Set-asides won"]];
+    for (const v of vendors.slice(0, MEMO_VENDOR_ROWS)) {
+      vendorRows.push([v.name, String(v.awards), money_(v.obligated),
+        Object.keys(v.agencies).join("; "), Object.keys(v.setAsides).join(", ") || "—"]);
+    }
+    boldHeaderTable_(body, vendorRows);
+  } else {
+    body.appendParagraph("No awards matched the market definition over the lookback — broaden the " +
+      "description or drop a filter.");
   }
 
   body.appendParagraph("5. Exhibits").setHeading(H.HEADING1);
@@ -356,7 +433,7 @@ function buildMemo_(q, entries, found, folder) {
 
 // ---------------------------------------------------------------- sheet --
 
-function writeIndex_(entries, remainder) {
+function writeIndex_(entries, others) {
   const headers = ["Status", "Title", "Solicitation #", "Agency", "Office", "Posted",
     "Deadline", "Set-aside", "Docs", "Folder", "Winner(s)", "Obligated", "SAM.gov"];
   const rows = [];
@@ -378,11 +455,15 @@ function writeIndex_(entries, remainder) {
       o.sam_url || "",
     ]);
   }
-  for (const o of remainder) {
+  for (const m of others) {
+    const o = m.opp;
     rows.push([o.active ? "Open" : "Closed", o.title || "", o.solicitation_number || "",
       (o.agency && o.agency.name) || "", (o.office && o.office.office_name) || "",
       dateOnly_(o.first_notice_date), dateOnly_(o.response_deadline), o.set_aside || "",
-      "not pulled", "", "", "", o.sam_url || ""]);
+      "not pulled", "",
+      m.winners.map((w) => w.vendor).join("; "),
+      m.winners.length ? m.winners.reduce((s, w) => s + w.obligated, 0) : "",
+      o.sam_url || ""]);
   }
   const ss = SpreadsheetApp.getActive();
   const sheet = ss.getSheetByName(SHEETS.index) || ss.insertSheet(SHEETS.index);
@@ -397,13 +478,36 @@ function writeIndex_(entries, remainder) {
   sheet.autoResizeColumns(1, headers.length);
 }
 
-function writeSummary_(q, found, entries, folderUrl, memoUrl) {
+function writeVendors_(vendors) {
+  const headers = ["Vendor", "UEI", "Awards", "Total obligated", "Last award",
+    "Agencies", "NAICS", "Set-asides won"];
+  const rows = vendors.map((v) => [
+    v.name, v.uei, v.awards, v.obligated, v.lastAward,
+    Object.keys(v.agencies).join("; "),
+    Object.keys(v.naics).join(", "),
+    Object.keys(v.setAsides).join(", "),
+  ]);
+  const ss = SpreadsheetApp.getActive();
+  const sheet = ss.getSheetByName(SHEETS.vendors) || ss.insertSheet(SHEETS.vendors);
+  sheet.clear();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight("bold").setBackground("#f1f3f4");
+  sheet.setFrozenRows(1);
+  if (rows.length) {
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    sheet.getRange(2, 4, rows.length, 1).setNumberFormat("$#,##0");
+  }
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function writeSummary_(q, found, entries, vendors, folderUrl, memoUrl) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.research);
   const fileCount = entries.reduce((s, e) => s + e.files.length, 0);
   const rows = [
     ["Last run", new Date(), ""],
     ["Similar requirements", found.length, found.filter((o) => o.active).length + " open"],
     ["Docs pulled", fileCount, "across " + entries.length + " requirements (see Doc Index)"],
+    ["Vendors identified", vendors.length, "ranked by dollars on the Vendors tab"],
     ["Evidence folder", folderUrl, ""],
     ["Draft memo", memoUrl, "review, edit, and sign — it's a draft, not a determination"],
   ];
@@ -454,6 +558,14 @@ function buildQuery_(params) {
     }
   }
   return parts.join("&");
+}
+
+function boldHeaderTable_(body, rows) {
+  const table = body.appendTable(rows);
+  for (let c = 0; c < rows[0].length; c++) {
+    table.getRow(0).getCell(c).editAsText().setBold(true);
+  }
+  return table;
 }
 
 function appendLink_(body, label, url) {

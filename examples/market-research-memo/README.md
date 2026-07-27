@@ -4,8 +4,8 @@ A Google Apps Script that does market research the way it actually gets done: by
 
 1. **Finds similar requirements** — SAM.gov opportunities like yours, open and recently closed.
 2. **Pulls the docs themselves** — downloads each requirement's solicitation documents (SOWs, PWSs, RFP packages, attachments) into a Drive folder, one subfolder per requirement.
-3. **Identifies the vendors** — matches each requirement to the FPDS award(s) it produced, by solicitation number.
-4. **Drafts the memo** — a Google Doc in FAR Part 10 shape: purpose, findings summary, requirement-by-requirement history with quoted notice text and links to every exhibit, a vendor table, and the evidence folder as exhibits.
+3. **Identifies the vendors** — two ways. Direct: every scanned closed requirement is matched to the FPDS award(s) it produced, by solicitation number. Broad: a market-wide award search over the lookback, rolled up per vendor and ranked by dollars on a **Vendors** tab.
+4. **Drafts the memo** — a Google Doc in FAR Part 10 shape: purpose, findings summary, requirement-by-requirement history with quoted notice text and links to every exhibit, a two-part vendor field (direct outcomes + the broader field), and the evidence folder as exhibits.
 
 The output isn't rows about documents — it's the documents, organized, plus a draft memo that cites them. What a capture team reads before writing a proposal; what a CO assembles before writing a requirement.
 
@@ -36,13 +36,15 @@ Sibling to [`../market-research-sheet/`](../market-research-sheet/): the sheet s
 - **A Drive folder** — `Market research — <your requirement> — <timestamp>` — with one subfolder per requirement, containing its actual solicitation files, named as posted.
 - **A draft memo Doc** inside that folder: quoted notice text per requirement, a link to every retrieved document, award outcomes with USASpending links, a vendor table, and an honest italic note that set-aside *history* isn't current size status.
 - **A "Doc Index" tab** in the Sheet: every requirement found (pulled or not), files retrieved, folder links, winners, obligated dollars, SAM.gov links.
+- **A "Vendors" tab**: the broader market rolled up per vendor — award count, total obligated, agencies, NAICS mix, set-asides won — ranked by dollars.
 
 ## How it works
 
 - Similar requirements come from `GET /api/opportunities/` — an open pass plus a closed pass bounded by the lookback, with a structured-filter retry when closed-notice text search comes up dry.
 - Each pulled requirement gets one detail call, `GET /api/opportunities/{id}/`, whose `attachments` list has two species: `type: "file"` (hosted documents with a public SAM.gov download URL) and `type: "link"` (external references — PIEE portals, agency pages). Files are downloaded; links are indexed.
 - Document downloads hit SAM.gov's public attachment URLs directly — no API key on those requests. Every download is individually fault-tolerant: a file that fails is recorded in the index and memo (`not retrieved (HTTP 404)`) and the run continues.
-- Winners come from `GET /api/contracts/?solicitation_identifier=…`. If the exact number misses, it retries with punctuation stripped — FPDS drops the hyphens SAM keeps (the same trick as [`../tango-lookup-extension/`](../tango-lookup-extension/)).
+- Winners come from `GET /api/contracts/?solicitation_identifier=…` for every scanned *closed* requirement (capped at 25 beyond the doc pulls — open notices can't have awards yet). If the exact number misses, it retries with punctuation stripped — FPDS drops the hyphens SAM keeps (the same trick as [`../tango-lookup-extension/`](../tango-lookup-extension/)).
+- The broader vendor field comes from `GET /api/contracts/?search=…&award_date_gte=<lookback>` — up to 150 awards matching the market definition, rolled up per recipient UEI. This is the backstop that keeps the vendor section honest even when solicitation matching runs thin: the most recent similar requirements are usually unawarded or not yet reported.
 
 ## Caveats
 
@@ -50,5 +52,5 @@ Sibling to [`../market-research-sheet/`](../market-research-sheet/): the sheet s
 - **The memo is a draft, not a determination.** It assembles evidence and citations; the judgment — and the signature — are yours.
 - **Downloads are the slow part.** 8 requirements × up to 10 files runs a few minutes. Files over 30MB are skipped by design (Apps Script's fetch ceiling is 50MB); the index says so when it happens.
 - **Award notices and pre-solicitations often have no files.** The memo falls back to quoting the notice and linking SAM.gov. Sources sought and solicitations carry the good documents.
-- **Solicitation-number matching is honest but imperfect.** Task orders under GWACs and mods can obscure lineage; "no award located" means *by this method*, not "never awarded."
+- **Solicitation-number matching is honest but imperfect.** Task orders under GWACs and mods can obscure lineage, and FPDS reporting can lag an award by up to 90 days — so recently closed requirements showing "no award located" is normal, not a miss. The broader vendor field exists precisely to cover this gap.
 - **Drive quota is yours.** Repeated runs create new timestamped folders; delete the ones you don't keep.
