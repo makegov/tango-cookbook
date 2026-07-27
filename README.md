@@ -29,6 +29,7 @@ Recipes and reference apps for the [Tango API](https://tango.makegov.com), prima
 | [`opportunities-agent`](./examples/opportunities-agent/) | A minimal Claude tool-use loop that answers plain-English questions about federal opportunities. |
 | [`incumbent-on-post`](./examples/incumbent-on-post/) | A new opportunity posts → brief the likely incumbent, prior award, and funding. A PydanticAI agent over the Tango MCP (the repo's first MCP integration), hardened with a deterministic scorer + evals. |
 | [`market-research-sheet`](./examples/market-research-sheet/) | Market research in a Google Sheet: describe a requirement, get similar requirements and the vendors winning that work — a copy-paste Google Apps Script, no server. |
+| [`looker-studio-connector`](./examples/looker-studio-connector/) | Tango awards as a live BI source — a Looker Studio community connector, plus a Power Query recipe for Power BI. Market-share dashboards with no server. |
 | [`saved-search-watcher`](./examples/saved-search-watcher/) | A YAML-driven watcher: poll a saved search on a schedule, diff against a JSON state file, alert on what's new. |
 | [`webhook-receiver`](./examples/webhook-receiver/) | A FastAPI app that accepts Tango webhook deliveries — signature-verified, idempotent, with a pluggable sink. |
 | [`webhook-worker`](./examples/webhook-worker/) | The easy button: a one-click "Deploy to Cloudflare" Worker that posts Tango alert matches to Slack — no server, no tunnel, no SDK. |

@@ -1,0 +1,17 @@
+{
+  "timeZone": "America/New_York",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/script.external_request"
+  ],
+  "dataStudio": {
+    "name": "Tango Federal Awards",
+    "description": "Federal award data (FPDS obligations) from the Tango API — filter to a market by description, NAICS, PSC, agency, or set-aside, and dashboard the spend.",
+    "company": "Tango Cookbook example (edit before publishing)",
+    "companyUrl": "https://tango.makegov.com",
+    "logoUrl": "https://raw.githubusercontent.com/makegov/tango-cookbook/main/examples/tango-lookup-extension/icons/icon128.png",
+    "addonUrl": "https://github.com/makegov/tango-cookbook/tree/main/examples/looker-studio-connector",
+    "supportUrl": "https://github.com/makegov/tango-cookbook/issues"
+  }
+}
