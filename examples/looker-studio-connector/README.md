@@ -1,10 +1,15 @@
 # Looker Studio connector
 
-A [Looker Studio community connector](https://developers.google.com/looker-studio/connector) that pipes Tango award data (FPDS obligations) straight into Google's free BI tool. Define a market — a description, a NAICS, a PSC, an agency, a set-aside — and dashboard the spend: obligations over time, top vendors, agency mix, set-aside split, all refreshing live from the API.
+A [Looker Studio community connector](https://developers.google.com/looker-studio/connector) that turns Tango into a **market research dashboard**. One connector, two datasets, both filtered to the same market:
 
-Where [`../market-research-sheet/`](../market-research-sheet/) answers *"who's winning this work?"* once, as a worksheet, this keeps the answer on a wall. Same platform, too: community connectors run on Apps Script, so it's still one file of JavaScript, no server, no build step.
+- **Requirements — what's posting.** SAM.gov opportunities matching your requirement, open *and* closed: how often it posts, under what set-asides, from which buying offices, with deadlines and links for the live ones.
+- **Awards — who's winning.** FPDS obligations for the same work: spend over time, top vendors, set-aside dollars, agency mix.
 
-**Not a Google shop?** Skip to [Power BI and everything else](#power-bi-and-everything-else) — the API's `flat=true` parameter makes Tango trivially tabular for any BI tool.
+Add the connector to a report twice — one data source per dataset, same market definition — and you get demand next to supply on one page: *"this requirement posts about once a month, mostly small-business set-asides, and these eight vendors split the dollars."* That's [`../market-research-sheet/`](../market-research-sheet/) turned into a wall dashboard that stays current, instead of a worksheet frozen at the moment you ran it.
+
+Community connectors run on Apps Script — the same platform as the sheet example. One file of JavaScript, no server, no build step.
+
+**Not a Google shop?** Skip to [Power BI and everything else](#power-bi-and-everything-else).
 
 ## Install (~5 minutes)
 
@@ -16,27 +21,44 @@ Where [`../market-research-sheet/`](../market-research-sheet/) answers *"who's w
    https://lookerstudio.google.com/datasources/create?connectorId=<HEAD_DEPLOYMENT_ID>
    ```
    (Older editor versions show a clickable *Latest code* link instead — same destination.)
-5. Authorize, paste your Tango API key (from [tango.makegov.com](https://tango.makegov.com)) — Looker Studio's native KEY auth stores it in *your* user properties, never in the report.
-6. Fill in the market filters (all optional, but give it at least a description, NAICS, or PSC), **Connect**, and **Create report**.
+5. Authorize (expect the "unverified app" screen — it's your own script), then paste your Tango API key (from [tango.makegov.com](https://tango.makegov.com)) into Looker Studio's native KEY auth screen. The key lives in *your* user properties, never in the report.
+6. Define the market and pick a **Dataset** — start with *Awards*, **Connect**, **Create report**. Then add the second side: in the report, **Add data ▸ your connector**, same market filters, Dataset = *Requirements*.
 
-The report's own date-range control drives the query (`award_date_gte`/`lte`), so a viewer scrubbing the timeline re-pulls exactly that window.
+## Defining the market
 
-## A starter dashboard, four widgets
+Both datasets share one config. The **Requirement description** field is the semantic search — it's what makes this market research rather than a spend feed. A bare NAICS gives you category analytics; a description gives you *"work like ours."* Pair a description with a NAICS or PSC for the cleanest cut. Agency and set-aside narrow further; the row cap (500–5,000) bounds each refresh.
 
-| Widget | Dimension | Metric |
-| --- | --- | --- |
-| Time series | Award date (by month) | Obligated |
-| Bar chart | Vendor (top 10) | Obligated |
-| Donut | Set-aside | Obligated |
-| Table | Department → Agency | Obligated, Record Count |
+The report's date-range control drives both sources: posted dates for requirements, award dates for awards. Set it to a year or more — the 28-day default makes every market look dead.
 
-That's a market-share dashboard a BD lead or a small-business specialist can read in ten seconds: is spend growing, who owns it, and how much of it is set aside.
+## The market research layout
 
-## The schema
+**Demand row** (Requirements data source):
 
-Dimensions: award date, vendor, UEI, PIID, solicitation #, department, agency, office, NAICS code + description, PSC code + description, set-aside, USASpending link. Metrics: **Obligated** and **Total contract value**, both `SUM`-aggregating USD.
+| Widget | Dimension | Metric / setup | The question it answers |
+| --- | --- | --- | --- |
+| Time series | Posted (Year Month) | Requirements posted | Does this requirement recur? Seasonal? |
+| Donut | Set-aside | Requirements posted | How does the government *intend* to compete this work? |
+| Table | Agency, Office | Requirements posted | Who has this problem? |
+| Table | Title, Response deadline, SAM.gov link — filter Status = Open | — | What can we bid *right now*? |
 
-One row per award, capped by the *Max awards to pull* config option (500–5,000). The connector follows the API's cursor pagination until the cap; the `?shape=` parameter trims each record to exactly the fields above.
+**Supply row** (Awards data source):
+
+| Widget | Dimension | Metric / setup | The question it answers |
+| --- | --- | --- | --- |
+| Time series | Award date (Year Month) | Obligated | Are the dollars growing? |
+| Bar | Vendor (top 10, sorted) | Obligated | Who wins this work — incumbents, teammates, competitors? |
+| Donut | Set-aside | Obligated | How does the work *actually* get competed? |
+| Table | Department, Agency | Obligated, Record Count | Where's the money coming from? |
+
+The demand donut against the supply donut is the quiet star: intent (set-asides on notices) versus outcome (set-aside dollars on awards) is the rule-of-two conversation in two charts.
+
+## The schemas
+
+**Requirements:** posted date, title, solicitation #, status (Open/Closed), agency, office, NAICS, PSC, set-aside, response deadline, SAM.gov link, plus a `Requirements posted` count metric. Closed notices are most of the demand history; if text search over them comes up dry where a code filter wouldn't, the connector retries the closed pass on structure alone (same fallback as the sheet example).
+
+**Awards:** award date, vendor, UEI, PIID, solicitation #, department/agency/office, NAICS and PSC code + description, set-aside, USASpending link, plus `Obligated` and `Total contract value` as SUM-aggregating USD metrics.
+
+One row per notice or award, `?shape=`-trimmed to exactly these fields, cursor-paginated to the row cap.
 
 ## Power BI and everything else
 
@@ -60,22 +82,23 @@ in
     Awards
 ```
 
-Set the data source credential to **Anonymous** — auth rides in the `X-API-KEY` header. The `flat=true` parameter is the BI cheat code: nested objects arrive as dotted columns (`recipient.display_name`, `awarding_office.agency_name`), so there's nothing to expand by hand.
+Set the data source credential to **Anonymous** — auth rides in the `X-API-KEY` header. The `flat=true` parameter is the BI cheat code: nested objects arrive as dotted columns (`recipient.display_name`, `awarding_office.agency_name`), nothing to expand by hand. For the demand side, point the same pattern at `/api/opportunities/` with `search`/`naics`/`first_notice_date_after` filters.
 
 Two honest notes: Power BI Desktop handles the pagination fine, but the *service*'s scheduled refresh dislikes dynamic URLs like cursor links — if you need scheduled refresh, land the data somewhere static first. And parameterize `ApiKey` instead of hardcoding it before you share the `.pbix`.
 
-Tableau, Metabase, Superset, DuckDB: same story — any REST-to-table step plus `flat=true` gets you a tidy awards table; or schedule [`../market-research-sheet/`](../market-research-sheet/) and point your BI tool at the Sheet.
+Tableau, Metabase, Superset, DuckDB: same story — any REST-to-table step plus `flat=true` gets you tidy tables; or schedule [`../market-research-sheet/`](../market-research-sheet/) and point your BI tool at the Sheet.
 
 ## Where to take it next
 
-- **Opportunities as a second dataset.** Clone the schema/`getData` pair against `/api/opportunities/` and a config toggle — pipeline dashboards next to spend dashboards.
-- **Blends.** Blend this source against itself on Vendor to chart a competitor's agency mix beside yours.
-- **Caching.** Add `CacheService` keyed on the query string if many viewers share a report — Looker Studio re-calls `getData` per widget.
-- **Publishing.** This manifest is deliberately test-deployment-grade. If you want it in the connector gallery, put your own name/logo in `appsscript.json` and follow Google's [publishing checklist](https://developers.google.com/looker-studio/connector/publish).
+- **Forecasts as a third dataset.** The requirements that haven't posted yet: clone the requirements schema/fetch pair against `/api/forecasts/` for agency procurement forecasts.
+- **Blends.** Blend demand and supply on NAICS + month to chart notices posted against dollars awarded on one axis.
+- **Caching.** Add `CacheService` keyed on the query string if many viewers share a report — Looker Studio calls `getData` per widget.
+- **Publishing.** This manifest is deliberately test-deployment-grade. For the connector gallery, put your own name/logo in `appsscript.json` and follow Google's [publishing checklist](https://developers.google.com/looker-studio/connector/publish).
 
 ## Caveats
 
 - **Not run in CI.** Hits a live API; results move with the data.
-- **Every widget is a query.** Looker Studio calls `getData` per chart per refresh; a busy report multiplied by the 5,000-row cap will feel it in both Apps Script quotas and refresh time. Use the row cap, the date range, and *File ▸ Extract data* for big static views.
-- **Obligations, not prices.** Same FPDS caveat as ever — obligated ≠ ceiling, de-obligations are negative, treat dollars as magnitude.
+- **Every widget is a query.** Looker Studio calls `getData` per chart per refresh; a busy report multiplied by the 5,000-row cap will feel it in Apps Script quotas and refresh time. Use the row cap, the date range, and *File ▸ Extract data* for big static views.
+- **Obligations, not prices.** Obligated ≠ ceiling, de-obligations are negative — treat award dollars as magnitude.
+- **Set-aside intent ≠ vendor size today.** A market full of set-aside history still deserves a SAM/DSBS check on the specific vendors before it goes in a memo.
 - **Keys are per-user, code is shared.** KEY auth keeps credentials out of the report, but anyone who can edit the *script* controls what runs under connected users' authorization.

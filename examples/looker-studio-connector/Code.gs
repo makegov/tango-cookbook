@@ -1,26 +1,35 @@
 /**
- * Tango Federal Awards — a Looker Studio community connector.
+ * Tango Market Research — a Looker Studio community connector.
  *
- * Pipes Tango award data (FPDS obligations) straight into Looker Studio,
- * so a market — a NAICS, a PSC, an agency, a search phrase — becomes a
- * live dashboard: spend over time, top vendors, agency mix, set-aside
- * split. Community connectors run on Apps Script, so this deploys from
+ * One connector, two datasets, both filtered to the same market (a
+ * description, a NAICS, a PSC, an agency, a set-aside):
+ *
+ *   Requirements — what's posting: SAM.gov opportunities, open and closed.
+ *   Awards       — who's winning: FPDS obligations.
+ *
+ * Add the connector to a report twice — one data source per dataset —
+ * and the dashboard shows demand next to supply: how often this
+ * requirement posts, under what set-asides, and which vendors split the
+ * dollars. Community connectors run on Apps Script, so this deploys from
  * the browser with no server and no build step.
  *
- * Auth: Looker Studio's native KEY flow — each viewer-turned-editor
- * supplies their own Tango API key once; it's stored in their user
- * properties, never in the report. Get a key at https://tango.makegov.com
+ * Auth: Looker Studio's native KEY flow — each user supplies their own
+ * Tango API key once; it's stored in their user properties, never in the
+ * report. Get a key at https://tango.makegov.com
  *
  * Docs: https://developers.google.com/looker-studio/connector
  */
 
 const TANGO_BASE = "https://tango.makegov.com";
 
-// Proven field shape (the API's ?shape= parameter) — everything the
-// schema below needs and nothing else, so pages stay small.
+// Proven field shapes (the API's ?shape= parameter) — everything the
+// schemas below need and nothing else, so pages stay small.
 const AWARD_SHAPE = "key,piid,solicitation_identifier,award_date,obligated," +
   "total_contract_value,set_aside(*),recipient(uei,display_name)," +
   "awarding_office(*),naics(*),psc(*)";
+const OPP_SHAPE = "opportunity_id,title,solicitation_number,active," +
+  "response_deadline,first_notice_date,set_aside,naics_code,psc_code," +
+  "sam_url,agency(name,code),office(office_name,office_code)";
 
 const MAX_PAGES = 400; // hard backstop on cursor-following, whatever the row cap
 
@@ -70,14 +79,22 @@ function getConfig() {
 
   config.newInfo()
     .setId("about")
-    .setText("Define the market. Every filter is optional, but at least one " +
-      "of description / NAICS / PSC keeps the data volume sane. The " +
-      "report's date range controls the award dates pulled.");
+    .setText("Define the market once, then pick which side of it this data " +
+      "source shows. Add the connector twice — one source per dataset — to " +
+      "put demand (requirements) and supply (awards) in the same report.");
+
+  config.newSelectSingle()
+    .setId("dataset")
+    .setName("Dataset")
+    .setHelpText("Requirements = SAM.gov opportunities (what's posting). " +
+      "Awards = FPDS obligations (who's winning). Defaults to Awards.")
+    .addOption(config.newOptionBuilder().setLabel("Awards — who's winning (FPDS)").setValue("awards"))
+    .addOption(config.newOptionBuilder().setLabel("Requirements — what's posting (SAM.gov)").setValue("requirements"));
 
   config.newTextInput()
     .setId("search")
     .setName("Requirement description")
-    .setHelpText("Plain English — \"enterprise IT service desk\". Semantic search over award descriptions.")
+    .setHelpText("Plain English — \"enterprise IT service desk\". Semantic search; this is what makes it market research rather than a spend feed.")
     .setAllowOverride(true);
 
   config.newTextInput()
@@ -94,7 +111,7 @@ function getConfig() {
 
   config.newTextInput()
     .setId("agency")
-    .setName("Awarding agency")
+    .setName("Agency")
     .setHelpText("Name, abbreviation, or code — fuzzy matched (\"VA\", \"Air Force\").")
     .setAllowOverride(true);
 
@@ -106,7 +123,7 @@ function getConfig() {
 
   config.newSelectSingle()
     .setId("max_records")
-    .setName("Max awards to pull")
+    .setName("Max records to pull")
     .setHelpText("Per refresh. Higher = slower refreshes; Apps Script quotas apply.")
     .addOption(config.newOptionBuilder().setLabel("500").setValue("500"))
     .addOption(config.newOptionBuilder().setLabel("1,000").setValue("1000"))
@@ -119,7 +136,11 @@ function getConfig() {
 
 // --------------------------------------------------------------- schema --
 
-function getFields_() {
+function getFields_(dataset) {
+  return dataset === "requirements" ? requirementFields_() : awardFields_();
+}
+
+function awardFields_() {
   const cc = DataStudioApp.createCommunityConnector();
   const fields = cc.getFields();
   const types = cc.FieldType;
@@ -148,32 +169,54 @@ function getFields_() {
   return fields;
 }
 
-function getSchema() {
-  return {schema: getFields_().build()};
+function requirementFields_() {
+  const cc = DataStudioApp.createCommunityConnector();
+  const fields = cc.getFields();
+  const types = cc.FieldType;
+  const aggs = cc.AggregationType;
+
+  fields.newDimension().setId("posted_date").setName("Posted").setType(types.YEAR_MONTH_DAY);
+  fields.newDimension().setId("title").setName("Title").setType(types.TEXT);
+  fields.newDimension().setId("solicitation_number").setName("Solicitation #").setType(types.TEXT);
+  fields.newDimension().setId("status").setName("Status").setType(types.TEXT);
+  fields.newDimension().setId("agency").setName("Agency").setType(types.TEXT);
+  fields.newDimension().setId("office").setName("Office").setType(types.TEXT);
+  fields.newDimension().setId("naics_code").setName("NAICS code").setType(types.TEXT);
+  fields.newDimension().setId("psc_code").setName("PSC code").setType(types.TEXT);
+  fields.newDimension().setId("set_aside").setName("Set-aside").setType(types.TEXT);
+  fields.newDimension().setId("response_deadline").setName("Response deadline").setType(types.YEAR_MONTH_DAY);
+  fields.newDimension().setId("sam_url").setName("SAM.gov link").setType(types.URL);
+
+  fields.newMetric().setId("opportunity_count").setName("Requirements posted").setType(types.NUMBER).setAggregation(aggs.SUM);
+
+  fields.setDefaultDimension("posted_date");
+  fields.setDefaultMetric("opportunity_count");
+  return fields;
+}
+
+function getSchema(request) {
+  const dataset = datasetOf_(request.configParams);
+  return {schema: getFields_(dataset).build()};
+}
+
+function datasetOf_(configParams) {
+  return configParams && configParams.dataset === "requirements" ? "requirements" : "awards";
 }
 
 // ----------------------------------------------------------------- data --
 
 function getData(request) {
   const params = request.configParams || {};
+  const dataset = datasetOf_(params);
   const range = request.dateRange || {};
   const sample = request.scriptParams && request.scriptParams.sampleExtraction;
   const cap = sample ? 25 : Number(params.max_records) || 1000;
 
-  const query = {
-    search: params.search,
-    naics: params.naics,
-    psc: params.psc,
-    awarding_agency: params.agency,
-    set_aside: params.set_aside,
-    award_date_gte: range.startDate,
-    award_date_lte: range.endDate,
-    shape: AWARD_SHAPE,
-  };
-
-  let awards;
+  let records;
   try {
-    awards = tangoList_("/api/contracts/", query, cap);
+    records = dataset === "requirements"
+      ? fetchRequirements_(params, range, cap)
+      : fetchAwards_(params, range, cap);
   } catch (err) {
     DataStudioApp.createCommunityConnector()
       .newUserError()
@@ -183,20 +226,63 @@ function getData(request) {
   }
 
   const ids = request.fields.map((f) => f.name);
-  const requested = getFields_().forIds(ids);
+  const mapper = dataset === "requirements" ? rowValuesRequirement_ : rowValuesAward_;
   return {
-    schema: requested.build(),
-    rows: awards.map((a) => ({values: rowValues_(ids, a)})),
+    schema: getFields_(dataset).forIds(ids).build(),
+    rows: records.map((r) => ({values: mapper(ids, r)})),
   };
 }
 
+function fetchAwards_(params, range, cap) {
+  return tangoList_("/api/contracts/", {
+    search: params.search,
+    naics: params.naics,
+    psc: params.psc,
+    awarding_agency: params.agency,
+    set_aside: params.set_aside,
+    award_date_gte: range.startDate,
+    award_date_lte: range.endDate,
+    shape: AWARD_SHAPE,
+  }, cap);
+}
+
+/**
+ * Open + closed opportunities in the report's date window. Closed notices
+ * are most of the demand history; if text search over them comes up dry
+ * and a code filter exists, retry the closed pass on structure alone —
+ * same fallback as the market-research-sheet example.
+ */
+function fetchRequirements_(params, range, cap) {
+  const base = {
+    search: params.search,
+    naics: params.naics,
+    psc: params.psc,
+    agency: params.agency,
+    set_aside: params.set_aside,
+    first_notice_date_after: range.startDate,
+    first_notice_date_before: range.endDate,
+    ordering: "-first_notice_date",
+    shape: OPP_SHAPE,
+  };
+  const open = tangoList_("/api/opportunities/", Object.assign({}, base, {active: "true"}), cap);
+  const remaining = cap - open.length;
+  let closed = [];
+  if (remaining > 0) {
+    closed = tangoList_("/api/opportunities/", Object.assign({}, base, {active: "false"}), remaining);
+    if (!closed.length && base.search && (base.naics || base.psc)) {
+      closed = tangoList_("/api/opportunities/", Object.assign({}, base, {active: "false", search: null}), remaining);
+    }
+  }
+  return open.concat(closed);
+}
+
 /** Maps one award record onto the requested field ids, in order. */
-function rowValues_(ids, a) {
+function rowValuesAward_(ids, a) {
   const recipient = a.recipient || {};
   const office = a.awarding_office || {};
   return ids.map((id) => {
     switch (id) {
-      case "award_date": return String(a.award_date || "").replace(/-/g, "");
+      case "award_date": return ymd_(a.award_date);
       case "vendor": return recipient.display_name || "";
       case "uei": return recipient.uei || "";
       case "piid": return a.piid || "";
@@ -215,6 +301,32 @@ function rowValues_(ids, a) {
       default: return "";
     }
   });
+}
+
+/** Maps one opportunity record onto the requested field ids, in order. */
+function rowValuesRequirement_(ids, o) {
+  return ids.map((id) => {
+    switch (id) {
+      case "posted_date": return ymd_(o.first_notice_date);
+      case "title": return o.title || "";
+      case "solicitation_number": return o.solicitation_number || "";
+      case "status": return o.active ? "Open" : "Closed";
+      case "agency": return (o.agency && o.agency.name) || "";
+      case "office": return (o.office && o.office.office_name) || "";
+      case "naics_code": return o.naics_code != null && o.naics_code !== "" ? String(o.naics_code) : "";
+      case "psc_code": return o.psc_code || "";
+      case "set_aside": return o.set_aside || "";
+      case "response_deadline": return ymd_(o.response_deadline);
+      case "sam_url": return o.sam_url || "";
+      case "opportunity_count": return 1;
+      default: return "";
+    }
+  });
+}
+
+/** "2026-07-07T15:48:23Z" or "2026-07-07" -> "20260707" (Looker Studio YEAR_MONTH_DAY). */
+function ymd_(value) {
+  return value ? String(value).slice(0, 10).replace(/-/g, "") : "";
 }
 
 // ---------------------------------------------------------------- tango --
