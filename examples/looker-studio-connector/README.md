@@ -11,7 +11,11 @@ Where [`../market-research-sheet/`](../market-research-sheet/) answers *"who's w
 1. Open [script.new](https://script.new) and name the project.
 2. Replace `Code.gs` with [`Code.gs`](./Code.gs) from this directory.
 3. **Project Settings ▸ Show "appsscript.json" manifest file**, then replace its contents with [`appsscript.json`](./appsscript.json).
-4. **Deploy ▸ Test deployments ▸ Select type: Looker Studio ▸ Done**, and click the *Latest code* link — it opens Looker Studio pointed at your connector.
+4. **Deploy ▸ Test deployments** — the connector appears as a *Google Workspace Add-on* with `Application(s): Data Studio` (this confirms the manifest registered). Copy the **Head Deployment ID** and open:
+   ```
+   https://lookerstudio.google.com/datasources/create?connectorId=<HEAD_DEPLOYMENT_ID>
+   ```
+   (Older editor versions show a clickable *Latest code* link instead — same destination.)
 5. Authorize, paste your Tango API key (from [tango.makegov.com](https://tango.makegov.com)) — Looker Studio's native KEY auth stores it in *your* user properties, never in the report.
 6. Fill in the market filters (all optional, but give it at least a description, NAICS, or PSC), **Connect**, and **Create report**.
 
