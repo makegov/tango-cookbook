@@ -195,6 +195,7 @@ function pullRequirement_(opp, rootFolder) {
   const entry = {
     opp: opp,
     excerpt: "",
+    noticeType: "",  // SAM notice type code — "a" is an award notice
     files: [],       // {name, url (Drive)}
     failed: [],      // {name, reason}
     links: [],       // type:"link" attachments — indexed, not downloaded
@@ -211,32 +212,52 @@ function pullRequirement_(opp, rootFolder) {
 
   if (detail) {
     entry.excerpt = excerpt_(detail.description);
+    entry.noticeType = (detail.meta && detail.meta.notice_type && detail.meta.notice_type.code) || "";
     const attachments = detail.attachments || [];
-    const fileAtts = attachments.filter((a) => a.type === "file" && a.url).slice(0, MAX_FILES_PER_REQ);
     entry.links = attachments.filter((a) => a.type === "link" && a.url).map((a) => a.url);
 
-    if (fileAtts.length) {
+    // Amendments repost attachments, so the manifest often lists the same
+    // filename under several notice versions — group by name and keep the
+    // first copy that actually downloads.
+    const byName = {};
+    const order = [];
+    for (const a of attachments) {
+      if (a.type !== "file" || !a.url) continue;
+      const k = String(a.name || a.resource_id || a.url).toLowerCase();
+      if (!byName[k]) { byName[k] = []; order.push(k); }
+      byName[k].push(a);
+    }
+
+    if (order.length) {
       const sub = rootFolder.createFolder(safeName_(
         (opp.solicitation_number || opp.opportunity_id) + " — " + (opp.title || "")));
       entry.folderUrl = sub.getUrl();
-      for (const att of fileAtts) {
-        const name = att.name || ("attachment" + extFor_(att.mime_type));
-        if (att.file_size && att.file_size > MAX_FILE_MB * 1024 * 1024) {
-          entry.failed.push({name: name, reason: "skipped, over " + MAX_FILE_MB + "MB"});
-          continue;
-        }
-        try {
-          // SAM.gov public attachment URL — no Tango key on this request.
-          const resp = UrlFetchApp.fetch(att.url, {muteHttpExceptions: true});
-          if (resp.getResponseCode() !== 200) {
-            entry.failed.push({name: name, reason: "HTTP " + resp.getResponseCode()});
+      for (const k of order.slice(0, MAX_FILES_PER_REQ)) {
+        const candidates = byName[k];
+        const name = candidates[0].name || ("attachment" + extFor_(candidates[0].mime_type));
+        let saved = false;
+        let lastReason = "no downloadable copy";
+        for (const att of candidates) {
+          if (att.file_size && att.file_size > MAX_FILE_MB * 1024 * 1024) {
+            lastReason = "skipped, over " + MAX_FILE_MB + "MB";
             continue;
           }
-          const file = sub.createFile(resp.getBlob().setName(safeName_(name)));
-          entry.files.push({name: name, url: file.getUrl()});
-        } catch (err) {
-          entry.failed.push({name: name, reason: String(err.message || err).slice(0, 120)});
+          try {
+            // SAM.gov public attachment URL — no Tango key on this request.
+            const resp = UrlFetchApp.fetch(att.url, {muteHttpExceptions: true});
+            if (resp.getResponseCode() !== 200) {
+              lastReason = "HTTP " + resp.getResponseCode();
+              continue;
+            }
+            const file = sub.createFile(resp.getBlob().setName(safeName_(name)));
+            entry.files.push({name: name, url: file.getUrl()});
+            saved = true;
+            break;
+          } catch (err) {
+            lastReason = String(err.message || err).slice(0, 120);
+          }
         }
+        if (!saved) entry.failed.push({name: name, reason: lastReason});
       }
     }
   }
@@ -245,15 +266,20 @@ function pullRequirement_(opp, rootFolder) {
   return entry;
 }
 
-/** FPDS awards for a solicitation number; retries with punctuation stripped
- *  (FPDS drops it, SAM keeps it — same trick as the lookup extension). */
+/**
+ * FPDS awards for a solicitation number. Retries with punctuation stripped
+ * (FPDS drops it, SAM keeps it — same trick as the lookup extension), then
+ * falls back to PIID matching: award notices put the award number, not the
+ * solicitation number, in SAM's solicitation field.
+ */
 function findWinners_(solicitationNumber) {
-  if (!solicitationNumber) return [];
-  let awards = winnerQuery_(solicitationNumber);
-  const stripped = solicitationNumber.replace(/[^A-Za-z0-9]/g, "");
-  if (!awards.length && stripped !== solicitationNumber) {
-    awards = winnerQuery_(stripped);
-  }
+  const sol = String(solicitationNumber || "").trim();
+  const stripped = sol.replace(/[^A-Za-z0-9]/g, "");
+  if (stripped.length < 6) return []; // junk ids ("1992", "12c2") match noise, not lineage
+  let awards = winnerQuery_({solicitation_identifier: sol});
+  if (!awards.length && stripped !== sol) awards = winnerQuery_({solicitation_identifier: stripped});
+  if (!awards.length) awards = winnerQuery_({piid: sol});
+  if (!awards.length && stripped !== sol) awards = winnerQuery_({piid: stripped});
   return awards.map((a) => ({
     vendor: (a.recipient && a.recipient.display_name) || "(unknown vendor)",
     uei: (a.recipient && a.recipient.uei) || "",
@@ -264,14 +290,35 @@ function findWinners_(solicitationNumber) {
   }));
 }
 
-function winnerQuery_(sol) {
+function winnerQuery_(filters) {
   try {
-    return tangoList_("/api/contracts/", {
-      solicitation_identifier: sol, shape: WINNER_SHAPE,
-    }, MAX_WINNERS_PER_REQ);
+    return tangoList_("/api/contracts/",
+      Object.assign({shape: WINNER_SHAPE}, filters), MAX_WINNERS_PER_REQ);
   } catch (err) {
     return [];
   }
+}
+
+/** Flattens matched requirements' winners, deduped by award — the same
+ *  award surfaces under presol + sol notice records sharing a number. */
+function dedupeDirectWins_(matched) {
+  const out = [];
+  const seen = {};
+  for (const e of matched) {
+    for (const w of e.winners) {
+      const k = w.key || (w.vendor + "|" + w.piid + "|" + w.awardDate);
+      if (seen[k]) continue;
+      seen[k] = true;
+      out.push({w: w, sol: e.opp.solicitation_number || ""});
+    }
+  }
+  return out;
+}
+
+function countUniqueVendors_(wins) {
+  const seen = {};
+  for (const d of wins) seen[d.w.uei || d.w.vendor] = true;
+  return Object.keys(seen).length;
 }
 
 /** Award-matches the scanned requirements beyond the doc pulls. Open notices
@@ -341,13 +388,13 @@ function buildMemo_(q, entries, others, found, folder, vendors, evidenceCount) {
   const openCount = found.filter((o) => o.active).length;
   const fileCount = entries.reduce((s, e) => s + e.files.length, 0);
   const matched = entries.concat(others);
-  const withWinners = matched.filter((e) => e.winners.length);
+  const directWins = dedupeDirectWins_(matched);
   const setAsideCounts = countBy_(found, (o) => o.set_aside || "None / unspecified");
   const bullets = [
     found.length + " similar requirements identified (" + openCount + " currently open); of the most recent " +
       entries.length + ", " + fileCount + " solicitation documents were retrieved as exhibits.",
-    "Awards were matched to " + withWinners.length + " requirements by solicitation number, naming " +
-      uniqueWinnerCount_(matched) + " distinct vendor(s) — see Section 4.",
+    directWins.length + " award(s) were matched to these requirements by solicitation or award number, naming " +
+      countUniqueVendors_(directWins) + " distinct vendor(s) — see Section 4.",
     "Broader market: " + vendors.length + " vendor(s) won " + evidenceCount +
       " awards matching this market since " + q.since + ".",
     "Set-aside pattern across all " + found.length + " notices: " + setAsideSentence_(setAsideCounts) + ".",
@@ -384,8 +431,11 @@ function buildMemo_(q, entries, others, found, folder, vendors, evidenceCount) {
           " — " + money_(w.obligated) + " obligated (" + w.piid + ")",
           w.key ? "https://www.usaspending.gov/award/" + encodeURIComponent(w.key) : "");
       }
+    } else if (e.noticeType === "a") {
+      body.appendParagraph("Outcome: award notice — the award is announced in the notice text above; " +
+        "no FPDS record matched yet (reporting can lag an award by up to 90 days).");
     } else {
-      body.appendParagraph("Outcome: no award located by solicitation number" +
+      body.appendParagraph("Outcome: no award located by solicitation or award number" +
         (o.active ? " (still open)" : "") + ".");
     }
   }
@@ -393,18 +443,16 @@ function buildMemo_(q, entries, others, found, folder, vendors, evidenceCount) {
   body.appendParagraph("4. Vendor field").setHeading(H.HEADING1);
 
   body.appendParagraph("Direct outcomes — awards matched to the requirements above").setHeading(H.HEADING2);
-  const winnerRows = [["Vendor", "UEI", "Solicitation #", "Award date", "Obligated"]];
-  for (const e of matched) {
-    for (const w of e.winners) {
-      winnerRows.push([w.vendor, w.uei, e.opp.solicitation_number || "", w.awardDate, money_(w.obligated)]);
+  if (directWins.length) {
+    const winnerRows = [["Vendor", "UEI", "Solicitation #", "Award date", "Obligated"]];
+    for (const d of directWins) {
+      winnerRows.push([d.w.vendor, d.w.uei, d.sol, d.w.awardDate, money_(d.w.obligated)]);
     }
-  }
-  if (winnerRows.length > 1) {
     boldHeaderTable_(body, winnerRows);
   } else {
-    body.appendParagraph("No awards matched by solicitation number. Recently closed solicitations are often " +
-      "unawarded or not yet reported — FPDS can lag an award by up to 90 days. The broader evidence below " +
-      "covers the gap.");
+    body.appendParagraph("No awards matched by solicitation or award number. Recently closed solicitations " +
+      "are often unawarded or not yet reported — FPDS can lag an award by up to 90 days. The broader " +
+      "evidence below covers the gap.");
   }
 
   body.appendParagraph("The broader vendor field — who wins this kind of work").setHeading(H.HEADING2);
@@ -616,12 +664,6 @@ function countBy_(items, keyFn) {
     out[k] = (out[k] || 0) + 1;
   }
   return out;
-}
-
-function uniqueWinnerCount_(entries) {
-  const seen = {};
-  for (const e of entries) for (const w of e.winners) seen[w.uei || w.vendor] = true;
-  return Object.keys(seen).length;
 }
 
 /** Notice text -> one clean quotable excerpt. */
